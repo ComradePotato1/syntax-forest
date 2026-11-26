@@ -1,4 +1,4 @@
-import { colorToCss } from './state.js?v=20261126a';
+import { colorToCss } from './state.js?v=20261126b';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
@@ -41,6 +41,7 @@ function formatRichLine(line) {
       strike: Boolean(line.strike),
       bold: Boolean(line.bold),
       italic: Boolean(line.italic),
+      smallCaps: Boolean(line.smallCaps),
       color: line.color,
       approxWidth: sym.length * 7.8 + (line.satisfied ? 16 : 0) + 12,
     };
@@ -49,6 +50,7 @@ function formatRichLine(line) {
   let strike = Boolean(line.strike);
   let bold = Boolean(line.bold);
   let italic = Boolean(line.italic);
+  let smallCaps = Boolean(line.smallCaps);
   let color = line.color || '';
 
   // Unwrap inline macros if user typed them directly in a text line
@@ -57,6 +59,8 @@ function formatRichLine(line) {
     strike = true;
     raw = stM[1].replace(/^\\mbox\{([\s\S]*)\}$/, '$1');
   }
+  const scM = raw.match(/^\\textsc\{([\s\S]*)\}$/);
+  if (scM) { smallCaps = true; raw = scM[1]; }
   const priM = raw.match(/^\\primary\{([\s\S]*)\}$/);
   if (priM) { bold = true; raw = priM[1]; }
   const secM = raw.match(/^\\secondary\{([\s\S]*)\}$/);
@@ -135,6 +139,7 @@ function formatRichLine(line) {
     strike,
     bold,
     italic,
+    smallCaps,
     color,
     approxWidth: Math.max(22, charCount * 8.4 + 14),
   };
@@ -150,6 +155,7 @@ function renderRichTextElement(rich, x, y, defaultColor) {
     fill: lineColor,
     'font-weight': rich.bold ? '700' : '400',
     'font-style': rich.italic ? 'italic' : 'normal',
+    'font-variant': rich.smallCaps ? 'small-caps' : undefined,
   });
 
   let overbarIndices = [];

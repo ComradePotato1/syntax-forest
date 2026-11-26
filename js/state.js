@@ -88,6 +88,7 @@ export function makeLine(text = 'XP', extra = {}) {
     strike: false,
     bold: false,
     italic: false,
+    smallCaps: false,
     color: '',
     ...extra,
   };

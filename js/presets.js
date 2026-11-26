@@ -1,4 +1,4 @@
-import { makeNode, makeLine, makeFeatureLine, makeConnector, makeCallout } from './state.js?v=20261126a';
+import { makeNode, makeLine, makeFeatureLine, makeConnector, makeCallout } from './state.js?v=20261126b';
 
 export function buildPreset(key) {
   switch (key) {

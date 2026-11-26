@@ -14,11 +14,11 @@ import {
   unwrapNodeById,
   insertParentAbove,
   HistoryManager,
-} from './state.js?v=20261126a';
-import { buildPreset } from './presets.js?v=20261126a';
-import { generateForestLatex } from './latex-gen.js?v=20261126a';
-import { parseForestLatex } from './forest-parser.js?v=20261126a';
-import { renderTreeSvg } from './renderer.js?v=20261126a';
+} from './state.js?v=20261126b';
+import { buildPreset } from './presets.js?v=20261126b';
+import { generateForestLatex } from './latex-gen.js?v=20261126b';
+import { parseForestLatex } from './forest-parser.js?v=20261126b';
+import { renderTreeSvg } from './renderer.js?v=20261126b';
 
 const STORAGE_KEY = 'syntaxforest_autosave_v1';
 const SAVED_TREES_KEY = 'syntaxforest_saved_trees_v1';
@@ -466,6 +466,12 @@ function renderNodeInspector() {
     iBtn.title = 'Italic (\\secondary{...})';
     iBtn.onclick = () => { line.italic = !line.italic; commitState(); };
 
+    const scBtn = document.createElement('button');
+    scBtn.className = `fmt-btn sc ${line.smallCaps ? 'active' : ''}`;
+    scBtn.textContent = 'Sc';
+    scBtn.title = 'Small Caps (\\textsc{...})';
+    scBtn.onclick = () => { line.smallCaps = !line.smallCaps; commitState(); };
+
     const sBtn = document.createElement('button');
     sBtn.className = `fmt-btn strike ${line.strike ? 'active' : ''}`;
     sBtn.textContent = 'S';
@@ -473,9 +479,9 @@ function renderNodeInspector() {
     sBtn.onclick = () => { line.strike = !line.strike; commitState(); };
 
     const colSel = document.createElement('select');
-    colSel.style.height = '22px';
-    colSel.style.fontSize = '11px';
-    colSel.style.maxWidth = '78px';
+    colSel.style.height = '20px';
+    colSel.style.fontSize = '10.5px';
+    colSel.style.maxWidth = '68px';
     for (const c of LATEX_COLORS) {
       const o = document.createElement('option');
       o.value = c.value;
@@ -485,7 +491,7 @@ function renderNodeInspector() {
     colSel.value = line.color || '';
     colSel.onchange = () => { line.color = colSel.value; commitState(); };
 
-    fmt.append(bBtn, iBtn, sBtn, colSel);
+    fmt.append(bBtn, iBtn, scBtn, sBtn, colSel);
 
     const ops = document.createElement('div');
     ops.className = 'fmt-group';

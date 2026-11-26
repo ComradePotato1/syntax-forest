@@ -1,4 +1,4 @@
-import { collectNodes, hexToTikzRgb } from './state.js?v=20261126a';
+import { collectNodes, hexToTikzRgb } from './state.js?v=20261126b';
 
 function formatColorOpt(color) {
   if (!color) return '';
@@ -23,6 +23,9 @@ function formatLineLatex(line) {
   }
   if (line.italic) {
     content = `\\secondary{${content}}`;
+  }
+  if (line.smallCaps) {
+    content = `\\textsc{${content}}`;
   }
   if (line.strike) {
     // soul's \st needs \mbox around macros or math

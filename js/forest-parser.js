@@ -1,4 +1,4 @@
-import { makeNode, makeLine, makeFeatureLine, makeConnector, makeCallout } from './state.js?v=20261126a';
+import { makeNode, makeLine, makeFeatureLine, makeConnector, makeCallout } from './state.js?v=20261126b';
 
 /**
  * Parses a \begin{forest}...\end{forest} block (or raw bracket tree) into our TreeState.
@@ -88,6 +88,7 @@ export function parseForestLatex(rawInput) {
     let strike = false;
     let bold = false;
     let italic = false;
+    let smallCaps = false;
 
     const tcHtml = s.match(/^\\textcolor\[HTML\]\{([0-9A-Fa-f]{6})\}\{([\s\S]*)\}$/);
     if (tcHtml) {
@@ -109,10 +110,16 @@ export function parseForestLatex(rawInput) {
       if (mbox) s = mbox[1];
     }
 
-    const priMatch = s.match(/^\\primary\{([\s\S]*)\}$/);
-    if (priMatch) { bold = true; s = priMatch[1]; }
-    const secMatch = s.match(/^\\secondary\{([\s\S]*)\}$/);
-    if (secMatch) { italic = true; s = secMatch[1]; }
+    let unwrapped = true;
+    while (unwrapped) {
+      unwrapped = false;
+      const scMatch = s.match(/^\\textsc\{([\s\S]*)\}$/);
+      if (scMatch) { smallCaps = true; s = scMatch[1]; unwrapped = true; continue; }
+      const priMatch = s.match(/^\\primary\{([\s\S]*)\}$/);
+      if (priMatch) { bold = true; s = priMatch[1]; unwrapped = true; continue; }
+      const secMatch = s.match(/^\\secondary\{([\s\S]*)\}$/);
+      if (secMatch) { italic = true; s = secMatch[1]; unwrapped = true; continue; }
+    }
 
     const featMatch = s.match(/^\\(s?)(mf|hf|af|mvf)\{([\s\S]*)\}$/);
     if (featMatch) {
@@ -120,6 +127,7 @@ export function parseForestLatex(rawInput) {
       line.strike = strike;
       line.bold = bold;
       line.italic = italic;
+      line.smallCaps = smallCaps;
       line.color = color;
       return line;
     }
@@ -127,11 +135,14 @@ export function parseForestLatex(rawInput) {
     if (plainFeat) {
       const line = makeFeatureLine(plainFeat[1], 'feature', false);
       line.strike = strike;
+      line.bold = bold;
+      line.italic = italic;
+      line.smallCaps = smallCaps;
       line.color = color;
       return line;
     }
 
-    return makeLine(s, { strike, bold, italic, color });
+    return makeLine(s, { strike, bold, italic, smallCaps, color });
   }
 
   function parseSubtree(depth = 0) {

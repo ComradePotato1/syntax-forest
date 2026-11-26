@@ -1,4 +1,4 @@
-import { makeNode, makeLine, makeFeatureLine, makeConnector, makeCallout } from './state.js?v=20261125d';
+import { makeNode, makeLine, makeFeatureLine, makeConnector, makeCallout } from './state.js?v=20261126a';
 
 /**
  * Parses a \begin{forest}...\end{forest} block (or raw bracket tree) into our TreeState.
@@ -312,11 +312,23 @@ export function parseForestLatex(rawInput) {
       body.includes('rectangle')
     ) continue;
 
+    // Extract node label before scanning coordinates so parenthesized label text never interferes
+    let label = '';
+    let labelPos = 'below';
+    const nodeLabelM = body.match(/node\s*\[([^\]]*)\]\s*\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}/);
+    const bodyNoNode = nodeLabelM ? body.replace(nodeLabelM[0], '') : body;
+    if (nodeLabelM) {
+      label = nodeLabelM[2].trim();
+      if (nodeLabelM[1].includes('above')) labelPos = 'above';
+      else if (nodeLabelM[1].includes('left')) labelPos = 'left';
+      else if (nodeLabelM[1].includes('right')) labelPos = 'right';
+    }
+
     // Match coordinates like (T.south) or ([yshift=-8pt]T.south)
     const coordPattern = /\((?:\[([^\]]*)\])?([a-zA-Z0-9_]+)(?:\.([a-z ]+))?\)/g;
     const coords = [];
     let cm;
-    while ((cm = coordPattern.exec(body)) !== null) {
+    while ((cm = coordPattern.exec(bodyNoNode)) !== null) {
       coords.push({ shift: cm[1] || '', name: cm[2], anchor: (cm[3] || 'south').trim() });
     }
     if (coords.length < 2) continue;
@@ -406,16 +418,6 @@ export function parseForestLatex(rawInput) {
 
     const ys1 = c1.shift.match(/yshift=(-?[0-9.]+)pt/);
     const ys2 = c2.shift.match(/yshift=(-?[0-9.]+)pt/);
-
-    let label = '';
-    let labelPos = 'below';
-    const nodeLabelM = body.match(/node\s*\[([^\]]*)\]\s*\{([\s\S]*)\}/);
-    if (nodeLabelM) {
-      label = nodeLabelM[2].trim();
-      if (nodeLabelM[1].includes('above')) labelPos = 'above';
-      else if (nodeLabelM[1].includes('left')) labelPos = 'left';
-      else if (nodeLabelM[1].includes('right')) labelPos = 'right';
-    }
 
     connectors.push(makeConnector(fromId, toId, {
       routing,

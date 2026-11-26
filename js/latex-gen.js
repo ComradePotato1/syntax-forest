@@ -1,4 +1,4 @@
-import { collectNodes, hexToTikzRgb } from './state.js?v=20261125d';
+import { collectNodes, hexToTikzRgb } from './state.js?v=20261126a';
 
 function formatColorOpt(color) {
   if (!color) return '';
@@ -289,6 +289,28 @@ export function generateForestLatex(state) {
     const startCoord = coordExpr(fromRef, c.fromAnchor, c.fromXShift, c.fromYShift);
     const endCoord = coordExpr(toRef, c.toAnchor, c.toXShift, c.toYShift);
 
+    let labelPart = '';
+    if (c.label && c.label.trim()) {
+      const raMode = c.raMode || (c.direction === 'above' ? 'u-above' : c.direction === 'side' ? 'l-bend' : 'u-below');
+      const posFrac = c.routing === 'right-angle'
+        ? (raMode === 'l-bend' ? 0.75 : (c.labelFraction ?? 0.25))
+        : 0.5;
+      const lOpts = [`pos=${posFrac}`];
+      if (c.labelItalic !== false) lOpts.push('font=\\itshape\\small');
+      else lOpts.push('font=\\small');
+      if (c.labelPos) lOpts.push(c.labelPos);
+      if (c.color) lOpts.push(`text=${formatColorOpt(c.color)}`);
+      labelPart = ` node [${lOpts.join(', ')}] {${c.label.trim()}}`;
+    }
+
+    if (c.routing === 'curved') {
+      const outA = c.outAngle != null ? c.outAngle : -90;
+      const inA = c.inAngle != null ? c.inAngle : -90;
+      const loose = c.looseness != null && Number(c.looseness) !== 1 ? `, looseness=${c.looseness}` : '';
+      // In TikZ, node labels on a `to[...]` path must appear before the target coordinate
+      return `    \\draw [${drawOpts.join(', ')}] ${startCoord} to[out=${outA}, in=${inA}${loose}]${labelPart ? `\n       ${labelPart}` : ''} ${endCoord};`;
+    }
+
     let pathStr = '';
     if (c.routing === 'right-angle') {
       const drop = Number(c.dropDepth ?? 1.8);
@@ -306,27 +328,11 @@ export function generateForestLatex(state) {
       } else {
         pathStr = `${startCoord} -- ++(0, ${+(-drop).toFixed(2)}em) -| ${endCoord}`;
       }
-    } else if (c.routing === 'curved') {
-      const outA = c.outAngle != null ? c.outAngle : -90;
-      const inA = c.inAngle != null ? c.inAngle : -90;
-      const loose = c.looseness != null && Number(c.looseness) !== 1 ? `, looseness=${c.looseness}` : '';
-      pathStr = `${startCoord} to[out=${outA}, in=${inA}${loose}] ${endCoord}`;
     } else {
       pathStr = `${startCoord} -- ${endCoord}`;
     }
 
-    let labelPart = '';
-    if (c.label && c.label.trim()) {
-      const posFrac = c.routing === 'right-angle' ? (c.labelFraction ?? 0.25) : 0.5;
-      const lOpts = [`pos=${posFrac}`];
-      if (c.labelItalic !== false) lOpts.push('font=\\itshape\\small');
-      else lOpts.push('font=\\small');
-      if (c.labelPos) lOpts.push(c.labelPos);
-      if (c.color) lOpts.push(`text=${formatColorOpt(c.color)}`);
-      labelPart = `\n        node [${lOpts.join(', ')}] {${c.label.trim()}}`;
-    }
-
-    return `    \\draw [${drawOpts.join(', ')}] ${pathStr}${labelPart};`;
+    return `    \\draw [${drawOpts.join(', ')}] ${pathStr}${labelPart ? `\n       ${labelPart}` : ''};`;
   }
 
   function renderCallout(cal, idx) {

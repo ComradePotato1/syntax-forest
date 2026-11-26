@@ -14,11 +14,11 @@ import {
   unwrapNodeById,
   insertParentAbove,
   HistoryManager,
-} from './state.js?v=20261125d';
-import { buildPreset } from './presets.js?v=20261125d';
-import { generateForestLatex } from './latex-gen.js?v=20261125d';
-import { parseForestLatex } from './forest-parser.js?v=20261125d';
-import { renderTreeSvg } from './renderer.js?v=20261125d';
+} from './state.js?v=20261126a';
+import { buildPreset } from './presets.js?v=20261126a';
+import { generateForestLatex } from './latex-gen.js?v=20261126a';
+import { parseForestLatex } from './forest-parser.js?v=20261126a';
+import { renderTreeSvg } from './renderer.js?v=20261126a';
 
 const STORAGE_KEY = 'syntaxforest_autosave_v1';
 const SAVED_TREES_KEY = 'syntaxforest_saved_trees_v1';
@@ -545,12 +545,14 @@ function renderNodeInspector() {
   lSepInp.value = node.lSep ? parseFloat(node.lSep) : '';
   sepScopeEl.onchange = () => { node.sepScope = sepScopeEl.value; commitState(); };
   sSepInp.oninput = () => {
-    node.sSep = sSepInp.value === '' ? '' : `${parseFloat(sSepInp.value)}em`;
+    const v = parseFloat(sSepInp.value);
+    node.sSep = sSepInp.value === '' || Number.isNaN(v) ? '' : `${v}em`;
     renderCanvasAndCode();
   };
   sSepInp.onchange = () => commitState();
   lSepInp.oninput = () => {
-    node.lSep = lSepInp.value === '' ? '' : `${parseFloat(lSepInp.value)}em`;
+    const v = parseFloat(lSepInp.value);
+    node.lSep = lSepInp.value === '' || Number.isNaN(v) ? '' : `${v}em`;
     renderCanvasAndCode();
   };
   lSepInp.onchange = () => commitState();

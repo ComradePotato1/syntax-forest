@@ -1,4 +1,4 @@
-import { colorToCss } from './state.js?v=20261125d';
+import { colorToCss } from './state.js?v=20261126a';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
@@ -217,8 +217,9 @@ export function renderTreeSvg(svg, state, ui) {
 
   const globalSSep = state.treeOptions?.sSep || '0em';
   const globalLSep = state.treeOptions?.lSep || '1em';
-  const lineHeight = 19;
-  const padY = 6;
+  // Match ling-200b.cls forest proportions consistently at 1em = 15px
+  const lineHeight = 18.5;
+  const padY = 3.5;
 
   const meta = new Map(); // id -> { node, richLines, w, h, x, y, subtreeBox, nodeBox, childrenSSep, childrenLSep }
 
@@ -226,22 +227,22 @@ export function renderTreeSvg(svg, state, ui) {
   function measure(node, inheritedGray = false, inheritedSSep = globalSSep, inheritedLSep = globalLSep) {
     const isGray = inheritedGray || Boolean(node.unpronounced);
     const richLines = (node.lines || []).map(formatRichLine);
-    let maxW = 28;
+    let maxW = 24;
     for (const r of richLines) {
       if (r.approxWidth > maxW) maxW = r.approxWidth;
     }
     if (node.projFeature) maxW += 14;
-    const h = Math.max(24, richLines.length * lineHeight + padY * 2);
+    const h = Math.max(22, richLines.length * lineHeight + padY * 2);
 
     const effSSepStr = node.sSep || inheritedSSep;
     const effLSepStr = node.lSep || inheritedLSep;
-    const childrenSSep = Math.max(4, parseEm(effSSepStr, 4) + 10);
-    const childrenLSep = Math.max(18, parseEm(effLSepStr, 15) + 14);
+    const childrenSSep = parseEm(effSSepStr, 0);
+    const childrenLSep = Math.max(6, parseEm(effLSepStr, 15));
 
     meta.set(node.id, {
       node, richLines, isGray, w: maxW, h,
       childrenSSep, childrenLSep,
-      subtreeW: maxW, relX: 0, x: 0, y: 0,
+      relX: 0, x: 0, y: 0,
     });
     const nextSSep = node.sepScope === 'subtree' && node.sSep ? node.sSep : inheritedSSep;
     const nextLSep = node.sepScope === 'subtree' && node.lSep ? node.lSep : inheritedLSep;
@@ -249,59 +250,87 @@ export function renderTreeSvg(svg, state, ui) {
   }
   measure(state.root, false, globalSSep, globalLSep);
 
-  // 2. Bottom-up subtree width & relative x offsets
-  function layoutBottomUp(node) {
+  // 2. Top-down Y positions first so contour packing knows exact vertical overlaps
+  function assignY(node, topY) {
     const m = meta.get(node.id);
+    m.y = topY;
+    const childTopY = topY + m.h + m.childrenLSep;
+    for (const ch of node.children || []) {
+      assignY(ch, childTopY);
+    }
+  }
+  assignY(state.root, 0);
+
+  // 3. Bottom-up contour-based X layout (mirrors LaTeX forest s sep, including negative s sep)
+  function layoutXBottomUp(node) {
+    const m = meta.get(node.id);
+    const ownRect = { top: m.y, bottom: m.y + m.h, left: -m.w / 2, right: m.w / 2 };
     if (!node.children || node.children.length === 0) {
-      m.subtreeW = m.w;
-      return;
+      m.relX = 0;
+      return [ownRect];
     }
-    for (const ch of node.children) layoutBottomUp(ch);
 
-    let totalChildrenW = 0;
-    node.children.forEach((ch, idx) => {
-      totalChildrenW += meta.get(ch.id).subtreeW;
-      if (idx > 0) totalChildrenW += m.childrenSSep;
-    });
+    const childRectLists = node.children.map((ch) => layoutXBottomUp(ch));
+    const placedRects = [...childRectLists[0]];
+    meta.get(node.children[0].id).relX = 0;
 
-    let cursor = -totalChildrenW / 2;
-    for (const ch of node.children) {
+    for (let i = 1; i < node.children.length; i++) {
+      const ch = node.children[i];
       const cm = meta.get(ch.id);
-      cm.relX = cursor + cm.subtreeW / 2;
-      cursor += cm.subtreeW + m.childrenSSep;
+      const rects = childRectLists[i];
+      let minDx = -Infinity;
+
+      for (const rA of placedRects) {
+        for (const rB of rects) {
+          if (rA.top < rB.bottom && rB.top < rA.bottom) {
+            const need = rA.right - rB.left + m.childrenSSep;
+            if (need > minDx) minDx = need;
+          }
+        }
+      }
+      if (minDx === -Infinity) {
+        const prev = node.children[i - 1];
+        const pm = meta.get(prev.id);
+        minDx = pm.relX + pm.w / 2 + cm.w / 2 + m.childrenSSep;
+      }
+
+      cm.relX = minDx;
+      for (const r of rects) {
+        placedRects.push({ top: r.top, bottom: r.bottom, left: r.left + minDx, right: r.right + minDx });
+      }
     }
 
-    // Center parent over first & last child centers (linguistics style!)
+    // Center parent over first & last child centers (linguistics style)
     const firstCx = meta.get(node.children[0].id).relX;
     const lastCx = meta.get(node.children[node.children.length - 1].id).relX;
     const mid = (firstCx + lastCx) / 2;
     for (const ch of node.children) {
       meta.get(ch.id).relX -= mid;
     }
-    m.subtreeW = Math.max(m.w, totalChildrenW);
+    const shifted = placedRects.map((r) => ({ top: r.top, bottom: r.bottom, left: r.left - mid, right: r.right - mid }));
+    shifted.push(ownRect);
+    return shifted;
   }
-  layoutBottomUp(state.root);
+  layoutXBottomUp(state.root);
 
-  // 3. Top-down absolute coordinates (top y per node)
-  function layoutTopDown(node, absX, topY) {
+  // 4. Top-down absolute X coordinates & nodeBoxes
+  function assignAbsX(node, absX) {
     const m = meta.get(node.id);
     m.x = absX;
-    m.y = topY;
     m.nodeBox = {
       left: absX - m.w / 2,
       right: absX + m.w / 2,
-      top: topY,
-      bottom: topY + m.h,
+      top: m.y,
+      bottom: m.y + m.h,
       cx: absX,
-      cy: topY + m.h / 2,
+      cy: m.y + m.h / 2,
     };
-    const childTopY = topY + m.h + m.childrenLSep;
     for (const ch of node.children || []) {
       const cm = meta.get(ch.id);
-      layoutTopDown(ch, absX + cm.relX, childTopY);
+      assignAbsX(ch, absX + cm.relX);
     }
   }
-  layoutTopDown(state.root, 0, 0);
+  assignAbsX(state.root, 0);
 
   // 4. Compute subtree bounding boxes (for `fit to=tree` brackets!)
   function computeSubtreeBoxes(node) {
@@ -599,7 +628,8 @@ export function renderTreeSvg(svg, state, ui) {
       }
     } else if (c.routing === 'curved') {
       const dist = Math.hypot(p2.x - p1.x, p2.y - p1.y) || 40;
-      const loose = (c.looseness != null ? c.looseness : 1.0) * Math.max(32, dist * 0.45);
+      // Match TikZ `to[out=..., in=..., looseness=...]` control handle factor (~0.3915 * dist * looseness)
+      const loose = (c.looseness != null ? c.looseness : 1.0) * dist * 0.3915;
       // Note: TikZ angles have +Y upward, SVG has +Y downward, so negate sin(angle)
       const radOut = ((c.outAngle ?? -90) * Math.PI) / 180;
       const radIn = ((c.inAngle ?? -90) * Math.PI) / 180;

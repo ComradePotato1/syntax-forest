@@ -126,13 +126,28 @@ custom.callouts.push(makeCallout(childB.id, '\\textit{note}', {
 const customLayout = renderTreeSvg(svg, custom, { mode: 'select', selectedNodeId: childA.id });
 assert(customLayout.meta.size >= 4, 'Custom layout rendered');
 
+// Verify per-branch positive and negative sSep both reflect in SVG X-positions
+const tpKids = childB.children;
+const gapBase = customLayout.meta.get(tpKids[1].id).x - customLayout.meta.get(tpKids[0].id).x;
+childB.sSep = '0em';
+const lZero = renderTreeSvg(svg, custom, { mode: 'select', selectedNodeId: childB.id });
+const gapZero = lZero.meta.get(tpKids[1].id).x - lZero.meta.get(tpKids[0].id).x;
+childB.sSep = '-1em';
+const lNeg = renderTreeSvg(svg, custom, { mode: 'select', selectedNodeId: childB.id });
+const gapNeg = lNeg.meta.get(tpKids[1].id).x - lNeg.meta.get(tpKids[0].id).x;
+assert(gapBase > gapZero && gapZero > gapNeg, `Per-branch sSep SVG gaps: 2.5em=${gapBase} > 0em=${gapZero} > -1em=${gapNeg}`);
+childB.sSep = '2.5em';
+renderTreeSvg(svg, custom, { mode: 'select', selectedNodeId: childA.id });
+
 const customLatex = generateForestLatex(custom);
 assert(customLatex.startsWith('\\begin{forest}') && customLatex.endsWith('\\end{forest}'), 'Custom tree strictly forest block');
 assert(customLatex.includes('s sep=2.5em') && customLatex.includes('l sep=1.75em'), 'Per-branch s sep and l sep emitted');
 assert(customLatex.includes(') |- (') && customLatex.includes(') -| ('), 'Right-angle L-bend and 7-bend emitted');
 assert(customLatex.includes('++(-3.25em, 0) |-'), 'Right-angle left C-route emitted');
+assert(/to\[out=-100, in=-80[^\]]*\]\s+node \[pos=0\.5[^\]]*\] \{Curved Link\} \(/.test(customLatex), 'Curved arrow label placed before target coord');
 const parsedCustom = parseForestLatex(customLatex);
 assert(parsedCustom.root.children[1].sSep === '2.5em', 'Per-branch sSep round-tripped');
+assert(parsedCustom.connectors.some((c) => c.routing === 'curved' && c.label === 'Curved Link'), 'Curved arrow label round-tripped');
 out.snippets.custom_mutations = customLatex;
 
 const mix = hexToTikzRgb('#2563eb');

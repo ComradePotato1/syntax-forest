@@ -215,15 +215,15 @@ export function renderTreeSvg(svg, state, ui) {
 
   [lBrackets, lEdges, lNodes, lConnectors, lCallouts, lOverlay].forEach((l) => (l.innerHTML = ''));
 
-  const sSep = Math.max(8, parseEm(state.treeOptions?.sSep, 4) + 10);
-  const lSep = Math.max(22, parseEm(state.treeOptions?.lSep, 15) + 14);
+  const globalSSep = state.treeOptions?.sSep || '0em';
+  const globalLSep = state.treeOptions?.lSep || '1em';
   const lineHeight = 19;
   const padY = 6;
 
-  const meta = new Map(); // id -> { node, richLines, w, h, x, y, subtreeBox, nodeBox }
+  const meta = new Map(); // id -> { node, richLines, w, h, x, y, subtreeBox, nodeBox, childrenSSep, childrenLSep }
 
-  // 1. Measure every node
-  function measure(node, inheritedGray = false) {
+  // 1. Measure every node and resolve per-branch spacing
+  function measure(node, inheritedGray = false, inheritedSSep = globalSSep, inheritedLSep = globalLSep) {
     const isGray = inheritedGray || Boolean(node.unpronounced);
     const richLines = (node.lines || []).map(formatRichLine);
     let maxW = 28;
@@ -232,10 +232,22 @@ export function renderTreeSvg(svg, state, ui) {
     }
     if (node.projFeature) maxW += 14;
     const h = Math.max(24, richLines.length * lineHeight + padY * 2);
-    meta.set(node.id, { node, richLines, isGray, w: maxW, h, subtreeW: maxW, relX: 0, x: 0, y: 0 });
-    for (const ch of node.children || []) measure(ch, isGray);
+
+    const effSSepStr = node.sSep || inheritedSSep;
+    const effLSepStr = node.lSep || inheritedLSep;
+    const childrenSSep = Math.max(4, parseEm(effSSepStr, 4) + 10);
+    const childrenLSep = Math.max(18, parseEm(effLSepStr, 15) + 14);
+
+    meta.set(node.id, {
+      node, richLines, isGray, w: maxW, h,
+      childrenSSep, childrenLSep,
+      subtreeW: maxW, relX: 0, x: 0, y: 0,
+    });
+    const nextSSep = node.sepScope === 'subtree' && node.sSep ? node.sSep : inheritedSSep;
+    const nextLSep = node.sepScope === 'subtree' && node.lSep ? node.lSep : inheritedLSep;
+    for (const ch of node.children || []) measure(ch, isGray, nextSSep, nextLSep);
   }
-  measure(state.root, false);
+  measure(state.root, false, globalSSep, globalLSep);
 
   // 2. Bottom-up subtree width & relative x offsets
   function layoutBottomUp(node) {
@@ -249,14 +261,14 @@ export function renderTreeSvg(svg, state, ui) {
     let totalChildrenW = 0;
     node.children.forEach((ch, idx) => {
       totalChildrenW += meta.get(ch.id).subtreeW;
-      if (idx > 0) totalChildrenW += sSep;
+      if (idx > 0) totalChildrenW += m.childrenSSep;
     });
 
     let cursor = -totalChildrenW / 2;
     for (const ch of node.children) {
       const cm = meta.get(ch.id);
       cm.relX = cursor + cm.subtreeW / 2;
-      cursor += cm.subtreeW + sSep;
+      cursor += cm.subtreeW + m.childrenSSep;
     }
 
     // Center parent over first & last child centers (linguistics style!)
@@ -283,7 +295,7 @@ export function renderTreeSvg(svg, state, ui) {
       cx: absX,
       cy: topY + m.h / 2,
     };
-    const childTopY = topY + m.h + lSep;
+    const childTopY = topY + m.h + m.childrenLSep;
     for (const ch of node.children || []) {
       const cm = meta.get(ch.id);
       layoutTopDown(ch, absX + cm.relX, childTopY);
@@ -531,31 +543,63 @@ export function renderTreeSvg(svg, state, ui) {
 
     if (c.routing === 'right-angle') {
       const dropPx = (c.dropDepth != null ? c.dropDepth : 1.8) * 15;
-      if (c.direction === 'side') {
-        const cornerX = p2.x;
-        const cornerY = p1.y;
-        d = `M ${p1.x} ${p1.y} L ${cornerX} ${cornerY} L ${p2.x} ${p2.y}`;
-        labelPt = { x: (p1.x + cornerX) / 2, y: cornerY };
-      } else {
-        const dir = c.direction === 'above' ? -1 : 1;
-        const midY = p1.y + dir * dropPx;
-        const r = c.roundedCorners !== false ? Math.min(4, Math.abs(p2.x - p1.x) / 3, dropPx / 2) : 0;
-        if (r > 0.5 && Math.abs(p2.x - p1.x) > 4) {
-          const sx = Math.sign(p2.x - p1.x);
-          const sy = Math.sign(midY - p1.y) || dir;
-          const sy2 = Math.sign(p2.y - midY) || -dir;
-          d = [
-            `M ${p1.x} ${p1.y}`,
-            `L ${p1.x} ${midY - sy * r}`,
-            `Q ${p1.x} ${midY}, ${p1.x + sx * r} ${midY}`,
-            `L ${p2.x - sx * r} ${midY}`,
-            `Q ${p2.x} ${midY}, ${p2.x} ${midY + sy2 * r}`,
-            `L ${p2.x} ${p2.y}`,
-          ].join(' ');
-        } else {
-          d = `M ${p1.x} ${p1.y} L ${p1.x} ${midY} L ${p2.x} ${midY} L ${p2.x} ${p2.y}`;
-        }
+      const inStubPx = (c.inDepth != null ? c.inDepth : 1.5) * 15;
+      const outA = c.outAngle ?? (c.direction === 'above' ? 90 : c.direction === 'side' ? 0 : -90);
+      const inA = c.inAngle ?? (c.direction === 'above' ? 90 : c.direction === 'side' ? 180 : -90);
+      const isAng = (a, t) => Math.abs((((a - t) % 360) + 540) % 360 - 180) < 1;
+
+      let pts = [];
+      if (isAng(outA, -90) && isAng(inA, -90)) {
+        const midY = p1.y + dropPx;
+        pts = [p1, { x: p1.x, y: midY }, { x: p2.x, y: midY }, p2];
         labelPt = { x: (p1.x + p2.x) / 2, y: midY };
+      } else if (isAng(outA, 90) && isAng(inA, 90)) {
+        const midY = p1.y - dropPx;
+        pts = [p1, { x: p1.x, y: midY }, { x: p2.x, y: midY }, p2];
+        labelPt = { x: (p1.x + p2.x) / 2, y: midY };
+      } else if (isAng(outA, 0) && isAng(inA, 0)) {
+        const midX = p1.x + dropPx;
+        pts = [p1, { x: midX, y: p1.y }, { x: midX, y: p2.y }, p2];
+        labelPt = { x: midX, y: (p1.y + p2.y) / 2 };
+      } else if (isAng(outA, 180) && isAng(inA, 180)) {
+        const midX = p1.x - dropPx;
+        pts = [p1, { x: midX, y: p1.y }, { x: midX, y: p2.y }, p2];
+        labelPt = { x: midX, y: (p1.y + p2.y) / 2 };
+      } else {
+        const radOut = (outA * Math.PI) / 180;
+        const radIn = (inA * Math.PI) / 180;
+        // SVG +y is downward, so negate sin(angle)
+        const q1 = { x: p1.x + dropPx * Math.cos(radOut), y: p1.y - dropPx * Math.sin(radOut) };
+        const q2 = Math.abs(inStubPx) < 0.5
+          ? p2
+          : { x: p2.x + inStubPx * Math.cos(radIn), y: p2.y - inStubPx * Math.sin(radIn) };
+        const horizFirst = Math.abs(Math.cos(radIn)) >= Math.abs(Math.sin(radIn));
+        const corner = horizFirst ? { x: q2.x, y: q1.y } : { x: q1.x, y: q2.y };
+        pts = q2 === p2 ? [p1, q1, corner, p2] : [p1, q1, corner, q2, p2];
+        labelPt = { x: (q1.x + corner.x) / 2, y: (q1.y + corner.y) / 2 };
+      }
+
+      if (c.roundedCorners !== false && pts.length > 2) {
+        const segs = [`M ${pts[0].x} ${pts[0].y}`];
+        for (let i = 1; i < pts.length - 1; i++) {
+          const prev = pts[i - 1];
+          const curr = pts[i];
+          const next = pts[i + 1];
+          const len1 = Math.hypot(curr.x - prev.x, curr.y - prev.y);
+          const len2 = Math.hypot(next.x - curr.x, next.y - curr.y);
+          const r = Math.min(4.5, len1 * 0.4, len2 * 0.4);
+          if (r > 0.5 && len1 > 0 && len2 > 0) {
+            const pA = { x: curr.x - ((curr.x - prev.x) / len1) * r, y: curr.y - ((curr.y - prev.y) / len1) * r };
+            const pB = { x: curr.x + ((next.x - curr.x) / len2) * r, y: curr.y + ((next.y - curr.y) / len2) * r };
+            segs.push(`L ${pA.x} ${pA.y} Q ${curr.x} ${curr.y}, ${pB.x} ${pB.y}`);
+          } else {
+            segs.push(`L ${curr.x} ${curr.y}`);
+          }
+        }
+        segs.push(`L ${pts[pts.length - 1].x} ${pts[pts.length - 1].y}`);
+        d = segs.join(' ');
+      } else {
+        d = pts.map((pt, i) => `${i === 0 ? 'M' : 'L'} ${pt.x} ${pt.y}`).join(' ');
       }
     } else if (c.routing === 'curved') {
       const dist = Math.hypot(p2.x - p1.x, p2.y - p1.y) || 40;

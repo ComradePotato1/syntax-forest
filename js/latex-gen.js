@@ -189,18 +189,25 @@ export function generateForestLatex(state) {
     const labelStr = (node.lines || []).map(formatLineLatex).join('\\\\') || ' ';
 
     const opts = [];
-    // Root tree options
+    // Root tree options and per-node separation options
+    const ft = [];
     if (depth === 1 && state.treeOptions) {
-      const ft = [];
       if (state.treeOptions.sSep && state.treeOptions.sSep !== '0em') {
         ft.push(`s sep=${state.treeOptions.sSep}`);
       }
       if (state.treeOptions.lSep && state.treeOptions.lSep !== '1em') {
         ft.push(`l sep=${state.treeOptions.lSep}`);
       }
-      if (ft.length > 0) {
-        opts.push(`for tree={${ft.join(', ')}}`);
-      }
+    }
+    if (node.sepScope === 'subtree') {
+      if (node.sSep) ft.push(`s sep=${node.sSep}`);
+      if (node.lSep) ft.push(`l sep=${node.lSep}`);
+    } else {
+      if (node.sSep) opts.push(`s sep=${node.sSep}`);
+      if (node.lSep) opts.push(`l sep=${node.lSep}`);
+    }
+    if (ft.length > 0) {
+      opts.unshift(`for tree={${ft.join(', ')}}`);
     }
 
     const names = nodeNameMap.get(node.id);
@@ -284,13 +291,41 @@ export function generateForestLatex(state) {
 
     let pathStr = '';
     if (c.routing === 'right-angle') {
-      const depth = c.dropDepth != null ? c.dropDepth : 1.8;
-      if (c.direction === 'above') {
-        pathStr = `${startCoord} -- ++(0, ${depth}em) -| ${endCoord}`;
-      } else if (c.direction === 'side') {
-        pathStr = `${startCoord} -| ${endCoord}`;
+      const drop = Number(c.dropDepth ?? 1.8);
+      const inStub = Number(c.inDepth ?? 1.5);
+      const outA = c.outAngle ?? (c.direction === 'above' ? 90 : c.direction === 'side' ? 0 : -90);
+      const inA = c.inAngle ?? (c.direction === 'above' ? 90 : c.direction === 'side' ? 180 : -90);
+      const isAng = (a, t) => Math.abs((((a - t) % 360) + 540) % 360 - 180) < 1;
+
+      if (isAng(outA, -90) && isAng(inA, -90)) {
+        pathStr = `${startCoord} -- ++(0, ${+(-drop).toFixed(2)}em) -| ${endCoord}`;
+      } else if (isAng(outA, 90) && isAng(inA, 90)) {
+        pathStr = `${startCoord} -- ++(0, ${+drop.toFixed(2)}em) -| ${endCoord}`;
+      } else if (isAng(outA, 0) && isAng(inA, 0)) {
+        pathStr = `${startCoord} -- ++(${+drop.toFixed(2)}em, 0) |- ${endCoord}`;
+      } else if (isAng(outA, 180) && isAng(inA, 180)) {
+        pathStr = `${startCoord} -- ++(${+(-drop).toFixed(2)}em, 0) |- ${endCoord}`;
       } else {
-        pathStr = `${startCoord} -- ++(0, -${depth}em) -| ${endCoord}`;
+        const radOut = (outA * Math.PI) / 180;
+        const radIn = (inA * Math.PI) / 180;
+        const dx1 = +(drop * Math.cos(radOut)).toFixed(2);
+        const dy1 = +(drop * Math.sin(radOut)).toFixed(2);
+        const dx2 = +(inStub * Math.cos(radIn)).toFixed(2);
+        const dy2 = +(inStub * Math.sin(radIn)).toFixed(2);
+        const bridge = Math.abs(Math.cos(radIn)) >= Math.abs(Math.sin(radIn)) ? '-|' : '|-';
+        if (Math.abs(inStub) < 0.01) {
+          pathStr = `${startCoord} -- ++(${dx1}em, ${dy1}em) ${bridge} ${endCoord}`;
+        } else {
+          const totalX = +((c.toXShift || 0) + dx2).toFixed(2);
+          const totalY = +(((c.toYShift || 0) / 10) + dy2).toFixed(2);
+          const stubShifts = [];
+          if (totalX !== 0) stubShifts.push(`xshift=${totalX}em`);
+          if (totalY !== 0) stubShifts.push(`yshift=${totalY}em`);
+          const q2Coord = stubShifts.length > 0
+            ? `([${stubShifts.join(', ')}]${toRef}.${c.toAnchor || 'south'})`
+            : `(${toRef}.${c.toAnchor || 'south'})`;
+          pathStr = `${startCoord} -- ++(${dx1}em, ${dy1}em) ${bridge} ${q2Coord} -- ${endCoord}`;
+        }
       }
     } else if (c.routing === 'curved') {
       const outA = c.outAngle != null ? c.outAngle : -90;

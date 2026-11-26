@@ -527,6 +527,25 @@ function renderNodeInspector() {
   unpChk.checked = Boolean(node.unpronounced);
   unpChk.onchange = () => { node.unpronounced = unpChk.checked; commitState(); };
 
+  // Per-branch node separation (s sep / l sep)
+  const sepScopeEl = document.getElementById('node-sep-scope');
+  const sSepInp = document.getElementById('node-ssep-input');
+  const lSepInp = document.getElementById('node-lsep-input');
+  sepScopeEl.value = node.sepScope || 'children';
+  sSepInp.value = node.sSep ? parseFloat(node.sSep) : '';
+  lSepInp.value = node.lSep ? parseFloat(node.lSep) : '';
+  sepScopeEl.onchange = () => { node.sepScope = sepScopeEl.value; commitState(); };
+  sSepInp.oninput = () => {
+    node.sSep = sSepInp.value === '' ? '' : `${parseFloat(sSepInp.value)}em`;
+    commitState(true);
+  };
+  sSepInp.onchange = () => commitState();
+  lSepInp.oninput = () => {
+    node.lSep = lSepInp.value === '' ? '' : `${parseFloat(lSepInp.value)}em`;
+    commitState(true);
+  };
+  lSepInp.onchange = () => commitState();
+
   // Projected feature
   const pfChk = document.getElementById('proj-feature-chk');
   const pfFields = document.getElementById('proj-feature-fields');
@@ -644,28 +663,103 @@ function renderConnectorsInspector() {
   document.getElementById('conn-right-angle-opts').classList.toggle('hidden', conn.routing !== 'right-angle');
   document.getElementById('conn-curved-opts').classList.toggle('hidden', conn.routing !== 'curved');
 
-  // Right angle controls
-  const dirSel = document.getElementById('conn-direction');
-  dirSel.value = conn.direction || 'below';
-  dirSel.onchange = () => {
-    conn.direction = dirSel.value;
-    if (conn.direction === 'above') {
-      conn.fromAnchor = 'north'; conn.toAnchor = 'north';
-    } else if (conn.direction === 'below') {
-      conn.fromAnchor = 'south'; conn.toAnchor = 'south';
-    }
-    commitState();
+  // Right angle controls (Out Angle, In Angle, Flexible Drop/Height, In Stub)
+  document.querySelectorAll('#conn-ra-presets .pill-btn').forEach((btn) => {
+    btn.onclick = () => {
+      const p = btn.dataset.ra;
+      if (p === 'below') {
+        conn.direction = 'below'; conn.outAngle = -90; conn.inAngle = -90;
+        conn.fromAnchor = 'south'; conn.toAnchor = 'south';
+      } else if (p === 'above') {
+        conn.direction = 'above'; conn.outAngle = 90; conn.inAngle = 90;
+        conn.fromAnchor = 'north'; conn.toAnchor = 'north';
+      } else if (p === 'left') {
+        conn.direction = 'side'; conn.outAngle = 180; conn.inAngle = 180;
+        conn.fromAnchor = 'west'; conn.toAnchor = 'west';
+      } else if (p === 'right') {
+        conn.direction = 'side'; conn.outAngle = 0; conn.inAngle = 0;
+        conn.fromAnchor = 'east'; conn.toAnchor = 'east';
+      } else if (p === 'lstep') {
+        conn.direction = 'side'; conn.outAngle = -90; conn.inAngle = 180;
+        conn.fromAnchor = 'south'; conn.toAnchor = 'west';
+      }
+      commitState();
+    };
+  });
+
+  const raOutR = document.getElementById('conn-ra-out-range');
+  const raOutN = document.getElementById('conn-ra-out-num');
+  const raOutV = document.getElementById('conn-ra-out-val');
+  const raInR = document.getElementById('conn-ra-in-range');
+  const raInN = document.getElementById('conn-ra-in-num');
+  const raInV = document.getElementById('conn-ra-in-val');
+  const curOut = conn.outAngle ?? -90;
+  const curIn = conn.inAngle ?? -90;
+  raOutR.value = curOut; raOutN.value = curOut; raOutV.textContent = String(curOut);
+  raInR.value = curIn; raInN.value = curIn; raInV.textContent = String(curIn);
+
+  const setRaOut = (val, commit) => {
+    const n = Math.max(-180, Math.min(180, parseFloat(val) || 0));
+    conn.outAngle = n;
+    raOutR.value = n; raOutN.value = n; raOutV.textContent = String(n);
+    commitState(!commit);
   };
+  const setRaIn = (val, commit) => {
+    const n = Math.max(-180, Math.min(180, parseFloat(val) || 0));
+    conn.inAngle = n;
+    raInR.value = n; raInN.value = n; raInV.textContent = String(n);
+    commitState(!commit);
+  };
+  raOutR.oninput = () => setRaOut(raOutR.value, false);
+  raOutR.onchange = () => commitState();
+  raOutN.oninput = () => setRaOut(raOutN.value, false);
+  raOutN.onchange = () => commitState();
+  raInR.oninput = () => setRaIn(raInR.value, false);
+  raInR.onchange = () => commitState();
+  raInN.oninput = () => setRaIn(raInN.value, false);
+  raInN.onchange = () => commitState();
+
   const dropRange = document.getElementById('conn-drop-range');
+  const dropNum = document.getElementById('conn-drop-num');
   const dropVal = document.getElementById('conn-drop-val');
-  dropRange.value = conn.dropDepth ?? 1.8;
-  dropVal.textContent = String(dropRange.value);
-  dropRange.oninput = () => {
-    conn.dropDepth = parseFloat(dropRange.value);
-    dropVal.textContent = String(dropRange.value);
-    commitState(true);
+  const curDrop = conn.dropDepth ?? 1.8;
+  dropRange.value = Math.max(0, Math.min(10, curDrop));
+  dropNum.value = curDrop;
+  dropVal.textContent = String(curDrop);
+  const setDrop = (val, commit) => {
+    const n = parseFloat(val);
+    if (Number.isNaN(n)) return;
+    conn.dropDepth = n;
+    dropRange.value = Math.max(0, Math.min(10, n));
+    dropNum.value = n;
+    dropVal.textContent = String(n);
+    commitState(!commit);
   };
+  dropRange.oninput = () => setDrop(dropRange.value, false);
   dropRange.onchange = () => commitState();
+  dropNum.oninput = () => setDrop(dropNum.value, false);
+  dropNum.onchange = () => commitState();
+
+  const inDepthRange = document.getElementById('conn-indepth-range');
+  const inDepthNum = document.getElementById('conn-indepth-num');
+  const inDepthVal = document.getElementById('conn-indepth-val');
+  const curInD = conn.inDepth ?? 1.5;
+  inDepthRange.value = Math.max(0, Math.min(8, curInD));
+  inDepthNum.value = curInD;
+  inDepthVal.textContent = String(curInD);
+  const setInDepth = (val, commit) => {
+    const n = parseFloat(val);
+    if (Number.isNaN(n)) return;
+    conn.inDepth = n;
+    inDepthRange.value = Math.max(0, Math.min(8, n));
+    inDepthNum.value = n;
+    inDepthVal.textContent = String(n);
+    commitState(!commit);
+  };
+  inDepthRange.oninput = () => setInDepth(inDepthRange.value, false);
+  inDepthRange.onchange = () => commitState();
+  inDepthNum.oninput = () => setInDepth(inDepthNum.value, false);
+  inDepthNum.onchange = () => commitState();
 
   const roundChk = document.getElementById('conn-rounded-chk');
   roundChk.checked = conn.roundedCorners !== false;

@@ -114,6 +114,9 @@ export function makeNode(linesOrText = 'XP', children = [], opts = {}) {
     unpronounced: false,
     edgeStyle: 'solid', // 'solid' | 'roof' | 'dotted' | 'dashed' | 'thick' | 'none'
     edgeColor: '',
+    sSep: '', // per-node sibling separation e.g. '1.5em' or '' (inherit)
+    lSep: '', // per-node level separation e.g. '1.5em' or '' (inherit)
+    sepScope: 'children', // 'children' | 'subtree'
     projFeature: null, // null or { featureKind: 'mf', text: 'd', satisfied: true }
     bracket: null, // null or { kind: 'brace'|'square'|'box', position: 'below'|'above', dottedGuides: true, guideHeight: 3, color: '', label: '' }
     children,
@@ -122,17 +125,21 @@ export function makeNode(linesOrText = 'XP', children = [], opts = {}) {
 }
 
 export function makeConnector(fromId, toId, opts = {}) {
+  const dir = opts.direction || 'below';
+  const defOut = dir === 'above' ? 90 : dir === 'side' ? 0 : -90;
+  const defIn = dir === 'above' ? 90 : dir === 'side' ? 180 : -90;
   return {
     id: genId('c'),
     fromId,
     toId,
     stylePreset: 'mvt',
     routing: 'right-angle', // 'right-angle' | 'curved' | 'straight'
-    direction: 'below', // 'below' | 'above' | 'side'
+    direction: dir, // 'below' | 'above' | 'side'
     dropDepth: 1.8,
+    inDepth: 1.5,
     roundedCorners: true,
-    outAngle: -90,
-    inAngle: -90,
+    outAngle: defOut,
+    inAngle: defIn,
     looseness: 1.0,
     fromAnchor: 'south',
     toAnchor: 'south',

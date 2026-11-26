@@ -24,7 +24,6 @@
           </span>
           <div>
             <div class="brand-title">SyntaxForest</div>
-            <div class="brand-sub">LaTeX <code>forest</code> &amp; <code>ling-200b</code> Studio</div>
           </div>
         </div>
 
@@ -271,6 +270,26 @@
 
             <div class="inspector-block">
               <div class="block-header">
+                <span>Branch Node Separation</span>
+                <select id="node-sep-scope" class="mini-select" title="Apply separation to direct children only or the entire subtree below this node">
+                  <option value="children">Direct children</option>
+                  <option value="subtree">Whole sub-branch</option>
+                </select>
+              </div>
+              <div class="field-row two-col">
+                <label class="field">
+                  <span>Sibling Sep (<code>s sep</code>, em)</span>
+                  <input id="node-ssep-input" type="number" step="0.25" placeholder="inherit" title="Space between this node's children in em (leave blank to inherit)" />
+                </label>
+                <label class="field">
+                  <span>Level Sep (<code>l sep</code>, em)</span>
+                  <input id="node-lsep-input" type="number" step="0.25" placeholder="inherit" title="Vertical space below this node in em (leave blank to inherit)" />
+                </label>
+              </div>
+            </div>
+
+            <div class="inspector-block">
+              <div class="block-header">
                 <span>Projected Feature (<code>proj-feature</code>)</span>
                 <input id="proj-feature-chk" type="checkbox" title="Attach a projected feature to the right of this node (like Ex 11)" />
               </div>
@@ -354,18 +373,46 @@
 
             <!-- Right-angle controls -->
             <div id="conn-right-angle-opts" class="sub-box">
+              <div class="field">
+                <span>Right-Angle Quick Presets</span>
+                <div class="preset-pills" id="conn-ra-presets">
+                  <button data-ra="below" class="pill-btn">Below (-90°)</button>
+                  <button data-ra="above" class="pill-btn">Above (90°)</button>
+                  <button data-ra="left" class="pill-btn">Left (180°)</button>
+                  <button data-ra="right" class="pill-btn">Right (0°)</button>
+                  <button data-ra="lstep" class="pill-btn">L-Step (-90°/180°)</button>
+                </div>
+              </div>
               <div class="field-row two-col">
                 <label class="field">
-                  <span>Route Side</span>
-                  <select id="conn-direction">
-                    <option value="below">Below Nodes (south)</option>
-                    <option value="above">Above Nodes (north)</option>
-                    <option value="side">Horizontal / Orthogonal</option>
-                  </select>
+                  <span>Out Angle (<span id="conn-ra-out-val">-90</span>°)</span>
+                  <div class="color-combo">
+                    <input id="conn-ra-out-range" type="range" min="-180" max="180" step="5" value="-90" />
+                    <input id="conn-ra-out-num" type="number" min="-180" max="180" step="5" value="-90" style="width:54px" />
+                  </div>
                 </label>
                 <label class="field">
-                  <span>Drop / Height (<span id="conn-drop-val">2</span>em)</span>
-                  <input id="conn-drop-range" type="range" min="0.5" max="5.5" step="0.25" value="2" />
+                  <span>In Angle (<span id="conn-ra-in-val">-90</span>°)</span>
+                  <div class="color-combo">
+                    <input id="conn-ra-in-range" type="range" min="-180" max="180" step="5" value="-90" />
+                    <input id="conn-ra-in-num" type="number" min="-180" max="180" step="5" value="-90" style="width:54px" />
+                  </div>
+                </label>
+              </div>
+              <div class="field-row two-col">
+                <label class="field">
+                  <span>Drop / Height (<span id="conn-drop-val">1.8</span>em)</span>
+                  <div class="color-combo">
+                    <input id="conn-drop-range" type="range" min="0" max="10" step="0.25" value="1.8" />
+                    <input id="conn-drop-num" type="number" step="0.1" value="1.8" style="width:54px" title="Any drop/height in em (positive or negative)" />
+                  </div>
+                </label>
+                <label class="field">
+                  <span>In Stub (<span id="conn-indepth-val">1.5</span>em)</span>
+                  <div class="color-combo">
+                    <input id="conn-indepth-range" type="range" min="0" max="8" step="0.25" value="1.5" />
+                    <input id="conn-indepth-num" type="number" step="0.1" value="1.5" style="width:54px" title="Target entry leg length when Out and In angles differ" />
+                  </div>
                 </label>
               </div>
               <label class="checkbox-row">

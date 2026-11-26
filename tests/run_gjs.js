@@ -90,19 +90,30 @@ for (const key of presetKeys) {
   out.snippets[key] = latex;
 }
 
-// Custom mutations: hex colors, strikethrough, curved & right-angle arrows, brackets, callout, insertParentAbove, unwrap
+// Custom mutations: hex colors, strikethrough, curved & right-angle arrows (with outAngle/inAngle/dropDepth/inDepth), per-branch sSep/lSep, brackets, callout, insertParentAbove, unwrap
 const custom = buildPreset('blank');
 const childA = custom.root.children[0];
 const childB = custom.root.children[1];
 childA.nodeColor = '#2563eb';
 childA.lines[0].strike = true;
 childA.lines[0].color = '#c0392b';
+childB.sSep = '2.5em';
+childB.lSep = '1.75em';
+childB.sepScope = 'children';
 childB.bracket = { kind: 'square', position: 'below', dottedGuides: true, guideHeight: 2.5, color: 'teal', label: 'TP domain' };
 const insertedId = insertParentAbove(custom, childA.id, 'ForceP');
 assert(Boolean(insertedId), 'insertParentAbove worked');
 custom.connectors.push(makeConnector(childA.id, childB.id, {
   routing: 'curved', outAngle: -100, inAngle: -80, looseness: 1.2,
   arrowHead: '<->', linePattern: 'dashed', color: '#7c3aed', label: 'Curved Link',
+}));
+custom.connectors.push(makeConnector(childA.id, childB.children[0].id, {
+  routing: 'right-angle', outAngle: -90, inAngle: 180, dropDepth: 6.5, inDepth: 1.5,
+  fromAnchor: 'south', toAnchor: 'west', arrowHead: '->', color: 'blue',
+}));
+custom.connectors.push(makeConnector(childB.children[1].id, childA.id, {
+  routing: 'right-angle', outAngle: 180, inAngle: 180, dropDepth: 3.25,
+  fromAnchor: 'west', toAnchor: 'west', arrowHead: '->', linePattern: 'dotted',
 }));
 custom.callouts.push(makeCallout(childB.id, '\\textit{note}', {
   relPos: 'right', offsetX: 1, offsetY: -2, routing: 'right-angle', color: 'orange',
@@ -113,6 +124,10 @@ assert(customLayout.meta.size >= 4, 'Custom layout rendered');
 
 const customLatex = generateForestLatex(custom);
 assert(customLatex.startsWith('\\begin{forest}') && customLatex.endsWith('\\end{forest}'), 'Custom tree strictly forest block');
+assert(customLatex.includes('s sep=2.5em') && customLatex.includes('l sep=1.75em'), 'Per-branch s sep and l sep emitted');
+assert(customLatex.includes('++(-3.25em, 0) |-'), 'Right-angle left C-route emitted');
+const parsedCustom = parseForestLatex(customLatex);
+assert(parsedCustom.root.children[1].sSep === '2.5em', 'Per-branch sSep round-tripped');
 out.snippets.custom_mutations = customLatex;
 
 const mix = hexToTikzRgb('#2563eb');

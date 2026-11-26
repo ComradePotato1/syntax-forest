@@ -134,7 +134,7 @@ export function parseForestLatex(rawInput) {
     return makeLine(s, { strike, bold, italic, color });
   }
 
-  function parseSubtree() {
+  function parseSubtree(depth = 0) {
     skipWs();
     if (src[pos] !== '[') {
       throw new Error(`Expected "[" at index ${pos}`);
@@ -170,8 +170,18 @@ export function parseForestLatex(rawInput) {
         const inner = opt.slice('for tree='.length).replace(/^\{|\}$/g, '');
         const sSepM = inner.match(/s sep=([^,}]+)/);
         const lSepM = inner.match(/l sep=([^,}]+)/);
-        if (sSepM) treeOptions.sSep = sSepM[1].trim();
-        if (lSepM) treeOptions.lSep = lSepM[1].trim();
+        if (depth === 0) {
+          if (sSepM) treeOptions.sSep = sSepM[1].trim();
+          if (lSepM) treeOptions.lSep = lSepM[1].trim();
+        } else {
+          node.sepScope = 'subtree';
+          if (sSepM) node.sSep = sSepM[1].trim();
+          if (lSepM) node.lSep = lSepM[1].trim();
+        }
+      } else if (opt.startsWith('s sep=')) {
+        node.sSep = opt.slice(6).trim();
+      } else if (opt.startsWith('l sep=')) {
+        node.lSep = opt.slice(6).trim();
       } else if (opt.startsWith('name=')) {
         node.name = opt.slice(5).trim();
         namedNodeMap.set(node.name, node.id);
@@ -219,7 +229,7 @@ export function parseForestLatex(rawInput) {
     while (pos < src.length) {
       skipWs();
       if (src[pos] === '[') {
-        node.children.push(parseSubtree());
+        node.children.push(parseSubtree(depth + 1));
       } else if (src[pos] === ']') {
         pos += 1;
         break;
@@ -347,13 +357,34 @@ export function parseForestLatex(rawInput) {
 
     if (body.includes('-|') || body.includes('|-')) {
       routing = 'right-angle';
-      const stepM = body.match(/\+\+\(\s*0\s*,\s*(-?[0-9.]+)em\s*\)/);
+      const stepM = body.match(/\+\+\(\s*(-?[0-9.]+)(?:em)?\s*,\s*(-?[0-9.]+)(?:em)?\s*\)/);
       if (stepM) {
-        const val = parseFloat(stepM[1]);
-        direction = val < 0 ? 'below' : 'above';
-        dropDepth = Math.abs(val);
+        const dx = parseFloat(stepM[1]);
+        const dy = parseFloat(stepM[2]);
+        dropDepth = +(Math.hypot(dx, dy)).toFixed(2);
+        outAngle = Math.round((Math.atan2(dy, dx) * 180) / Math.PI);
+        if (Math.abs(dx) < 0.01) {
+          direction = dy < 0 ? 'below' : 'above';
+          inAngle = outAngle;
+        } else if (Math.abs(dy) < 0.01) {
+          direction = 'side';
+          inAngle = outAngle;
+        }
       } else if (!body.includes('++')) {
         direction = 'side';
+        outAngle = 0;
+        inAngle = 180;
+      }
+      // Check if there is an intermediate stub coordinate before final --
+      if (coords.length >= 3) {
+        const stub = coords[1];
+        const xm = stub.shift.match(/xshift=(-?[0-9.]+)em/);
+        const ym = stub.shift.match(/yshift=(-?[0-9.]+)em/);
+        const sx = xm ? parseFloat(xm[1]) : 0;
+        const sy = ym ? parseFloat(ym[1]) : 0;
+        if (sx !== 0 || sy !== 0) {
+          inAngle = Math.round((Math.atan2(sy, sx) * 180) / Math.PI);
+        }
       }
     } else if (body.includes('to[')) {
       routing = 'curved';

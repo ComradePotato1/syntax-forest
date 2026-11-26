@@ -1,4 +1,4 @@
-import { collectNodes, hexToTikzRgb } from './state.js';
+import { collectNodes, hexToTikzRgb } from './state.js?v=20261125c';
 
 function formatColorOpt(color) {
   if (!color) return '';

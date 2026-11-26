@@ -1,4 +1,4 @@
-import { colorToCss } from './state.js';
+import { colorToCss } from './state.js?v=20261125c';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 

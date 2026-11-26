@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>SyntaxForest — LaTeX Forest Syntax Tree Builder (LING 200B)</title>
-  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="styles.css?v=20261125c" />
 </head>
 <body>
   <div id="app" class="app-shell">
@@ -220,13 +220,13 @@
                 <span>TikZ Node Name</span>
                 <input id="node-name-input" type="text" placeholder="auto (optional)" />
               </label>
-              <label class="field">
+              <div class="field">
                 <span>Node Font Color</span>
                 <div class="color-combo">
                   <select id="node-color-select"></select>
                   <input id="node-color-custom" type="color" value="#1e293b" title="Custom node text color" />
                 </div>
-              </label>
+              </div>
             </div>
 
             <div class="inspector-block">
@@ -254,13 +254,13 @@
                     <option value="none">No Branch (hidden)</option>
                   </select>
                 </label>
-                <label class="field">
+                <div class="field">
                   <span>Branch Color</span>
                   <div class="color-combo">
                     <select id="node-edge-color-select"></select>
                     <input id="node-edge-color-custom" type="color" value="#1e293b" title="Custom branch color" />
                   </div>
-                </label>
+                </div>
               </div>
               <label class="checkbox-row">
                 <input id="node-unpronounced-chk" type="checkbox" />
@@ -384,36 +384,36 @@
                 </div>
               </div>
               <div class="field-row two-col">
-                <label class="field">
+                <div class="field">
                   <span>Out Angle (<span id="conn-ra-out-val">-90</span>°)</span>
                   <div class="color-combo">
                     <input id="conn-ra-out-range" type="range" min="-180" max="180" step="5" value="-90" />
                     <input id="conn-ra-out-num" type="number" min="-180" max="180" step="5" value="-90" style="width:54px" />
                   </div>
-                </label>
-                <label class="field">
+                </div>
+                <div class="field">
                   <span>In Angle (<span id="conn-ra-in-val">-90</span>°)</span>
                   <div class="color-combo">
                     <input id="conn-ra-in-range" type="range" min="-180" max="180" step="5" value="-90" />
                     <input id="conn-ra-in-num" type="number" min="-180" max="180" step="5" value="-90" style="width:54px" />
                   </div>
-                </label>
+                </div>
               </div>
               <div class="field-row two-col">
-                <label class="field">
+                <div class="field">
                   <span>Drop / Height (<span id="conn-drop-val">1.8</span>em)</span>
                   <div class="color-combo">
                     <input id="conn-drop-range" type="range" min="0" max="10" step="0.25" value="1.8" />
                     <input id="conn-drop-num" type="number" step="0.1" value="1.8" style="width:54px" title="Any drop/height in em (positive or negative)" />
                   </div>
-                </label>
-                <label class="field">
+                </div>
+                <div class="field">
                   <span>In Stub (<span id="conn-indepth-val">1.5</span>em)</span>
                   <div class="color-combo">
                     <input id="conn-indepth-range" type="range" min="0" max="8" step="0.25" value="1.5" />
                     <input id="conn-indepth-num" type="number" step="0.1" value="1.5" style="width:54px" title="Target entry leg length when Out and In angles differ" />
                   </div>
-                </label>
+                </div>
               </div>
               <label class="checkbox-row">
                 <input id="conn-rounded-chk" type="checkbox" checked />
@@ -503,13 +503,13 @@
                   <option value="south east">south east</option>
                 </select>
               </label>
-              <label class="field">
+              <div class="field">
                 <span>Color</span>
                 <div class="color-combo">
                   <select id="conn-color-select"></select>
                   <input id="conn-color-custom" type="color" value="#1e293b" />
                 </div>
-              </label>
+              </div>
             </div>
 
             <div class="field-row two-col">
@@ -574,13 +574,13 @@
                 </label>
               </div>
               <div class="field-row two-col">
-                <label class="field">
+                <div class="field">
                   <span>Color</span>
                   <div class="color-combo">
                     <select id="bracket-color-select"></select>
                     <input id="bracket-color-custom" type="color" value="#1e293b" />
                   </div>
-                </label>
+                </div>
                 <label class="field">
                   <span>Label (optional)</span>
                   <input id="bracket-label-input" type="text" placeholder="e.g. Head cluster" />
@@ -662,13 +662,13 @@
                   <input id="callout-in" type="number" step="15" value="225" />
                 </label>
               </div>
-              <label class="field">
+              <div class="field">
                 <span>Color</span>
                 <div class="color-combo">
                   <select id="callout-color-select"></select>
                   <input id="callout-color-custom" type="color" value="#1e293b" />
                 </div>
-              </label>
+              </div>
             </div>
           </div>
         </div>
@@ -777,6 +777,6 @@
     </div>
   </div>
 
-  <script type="module" src="js/app.js"></script>
+  <script type="module" src="js/app.js?v=20261125c"></script>
 </body>
 </html>

@@ -14,11 +14,11 @@ import {
   unwrapNodeById,
   insertParentAbove,
   HistoryManager,
-} from './state.js';
-import { buildPreset } from './presets.js';
-import { generateForestLatex } from './latex-gen.js';
-import { parseForestLatex } from './forest-parser.js';
-import { renderTreeSvg } from './renderer.js';
+} from './state.js?v=20261125c';
+import { buildPreset } from './presets.js?v=20261125c';
+import { generateForestLatex } from './latex-gen.js?v=20261125c';
+import { parseForestLatex } from './forest-parser.js?v=20261125c';
+import { renderTreeSvg } from './renderer.js?v=20261125c';
 
 const STORAGE_KEY = 'syntaxforest_autosave_v1';
 const SAVED_TREES_KEY = 'syntaxforest_saved_trees_v1';
@@ -215,6 +215,15 @@ function buildPalettes() {
 // ---------- STATE & HISTORY ----------
 function getSelectedNode() {
   return ui.selectedNodeId ? findNode(state.root, ui.selectedNodeId) : null;
+}
+
+function renderCanvasAndCode() {
+  ui.lastLayout = renderTreeSvg(svg, state, ui);
+  applyTransform();
+  latexOutput.textContent = generateForestLatex(state);
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  } catch {}
 }
 
 function commitState(skipHistory = false) {
@@ -422,7 +431,7 @@ function renderNodeInspector() {
     txtInp.onfocus = () => { ui.lastFocusedTextInput = txtInp; };
     txtInp.oninput = () => {
       line.text = txtInp.value;
-      commitState(true);
+      renderCanvasAndCode();
     };
     txtInp.onchange = () => commitState();
 
@@ -537,12 +546,12 @@ function renderNodeInspector() {
   sepScopeEl.onchange = () => { node.sepScope = sepScopeEl.value; commitState(); };
   sSepInp.oninput = () => {
     node.sSep = sSepInp.value === '' ? '' : `${parseFloat(sSepInp.value)}em`;
-    commitState(true);
+    renderCanvasAndCode();
   };
   sSepInp.onchange = () => commitState();
   lSepInp.oninput = () => {
     node.lSep = lSepInp.value === '' ? '' : `${parseFloat(lSepInp.value)}em`;
-    commitState(true);
+    renderCanvasAndCode();
   };
   lSepInp.onchange = () => commitState();
 
@@ -563,7 +572,7 @@ function renderNodeInspector() {
     tEl.value = node.projFeature.text || '';
     sEl.checked = Boolean(node.projFeature.satisfied);
     kEl.onchange = () => { node.projFeature.featureKind = kEl.value; commitState(); };
-    tEl.oninput = () => { node.projFeature.text = tEl.value; commitState(true); };
+    tEl.oninput = () => { node.projFeature.text = tEl.value; renderCanvasAndCode(); };
     tEl.onchange = () => commitState();
     sEl.onchange = () => { node.projFeature.satisfied = sEl.checked; commitState(); };
   }
@@ -597,12 +606,16 @@ function renderConnectorsInspector() {
   });
 
   const editor = document.getElementById('conn-editor');
+  if (!ui.selectedConnectorId && state.connectors.length > 0) {
+    ui.selectedConnectorId = state.connectors[0].id;
+  }
   const conn = state.connectors.find((c) => c.id === ui.selectedConnectorId);
   if (!conn) {
     editor.classList.add('hidden');
     return;
   }
   editor.classList.remove('hidden');
+  conn.routing = conn.routing || 'right-angle';
 
   const fromSel = document.getElementById('conn-from-select');
   const toSel = document.getElementById('conn-to-select');
@@ -693,77 +706,93 @@ function renderConnectorsInspector() {
   const raInR = document.getElementById('conn-ra-in-range');
   const raInN = document.getElementById('conn-ra-in-num');
   const raInV = document.getElementById('conn-ra-in-val');
-  const curOut = conn.outAngle ?? -90;
-  const curIn = conn.inAngle ?? -90;
-  raOutR.value = curOut; raOutN.value = curOut; raOutV.textContent = String(curOut);
-  raInR.value = curIn; raInN.value = curIn; raInV.textContent = String(curIn);
+  if (raOutR && raOutN && raOutV && raInR && raInN && raInV) {
+    const curOut = conn.outAngle ?? -90;
+    const curIn = conn.inAngle ?? -90;
+    raOutR.value = curOut; raOutN.value = curOut; raOutV.textContent = String(curOut);
+    raInR.value = curIn; raInN.value = curIn; raInV.textContent = String(curIn);
 
-  const setRaOut = (val, commit) => {
-    const n = Math.max(-180, Math.min(180, parseFloat(val) || 0));
-    conn.outAngle = n;
-    raOutR.value = n; raOutN.value = n; raOutV.textContent = String(n);
-    commitState(!commit);
-  };
-  const setRaIn = (val, commit) => {
-    const n = Math.max(-180, Math.min(180, parseFloat(val) || 0));
-    conn.inAngle = n;
-    raInR.value = n; raInN.value = n; raInV.textContent = String(n);
-    commitState(!commit);
-  };
-  raOutR.oninput = () => setRaOut(raOutR.value, false);
-  raOutR.onchange = () => commitState();
-  raOutN.oninput = () => setRaOut(raOutN.value, false);
-  raOutN.onchange = () => commitState();
-  raInR.oninput = () => setRaIn(raInR.value, false);
-  raInR.onchange = () => commitState();
-  raInN.oninput = () => setRaIn(raInN.value, false);
-  raInN.onchange = () => commitState();
+    const applyRaOut = (val, fromRange) => {
+      const parsed = parseFloat(val);
+      if (Number.isNaN(parsed)) return;
+      const n = Math.max(-180, Math.min(180, parsed));
+      conn.outAngle = n;
+      raOutR.value = n;
+      if (fromRange) raOutN.value = n;
+      raOutV.textContent = String(n);
+      renderCanvasAndCode();
+    };
+    const applyRaIn = (val, fromRange) => {
+      const parsed = parseFloat(val);
+      if (Number.isNaN(parsed)) return;
+      const n = Math.max(-180, Math.min(180, parsed));
+      conn.inAngle = n;
+      raInR.value = n;
+      if (fromRange) raInN.value = n;
+      raInV.textContent = String(n);
+      renderCanvasAndCode();
+    };
+    raOutR.oninput = () => applyRaOut(raOutR.value, true);
+    raOutR.onchange = () => commitState();
+    raOutN.oninput = () => applyRaOut(raOutN.value, false);
+    raOutN.onchange = () => commitState();
+    raInR.oninput = () => applyRaIn(raInR.value, true);
+    raInR.onchange = () => commitState();
+    raInN.oninput = () => applyRaIn(raInN.value, false);
+    raInN.onchange = () => commitState();
+  }
 
   const dropRange = document.getElementById('conn-drop-range');
   const dropNum = document.getElementById('conn-drop-num');
   const dropVal = document.getElementById('conn-drop-val');
-  const curDrop = conn.dropDepth ?? 1.8;
-  dropRange.value = Math.max(0, Math.min(10, curDrop));
-  dropNum.value = curDrop;
-  dropVal.textContent = String(curDrop);
-  const setDrop = (val, commit) => {
-    const n = parseFloat(val);
-    if (Number.isNaN(n)) return;
-    conn.dropDepth = n;
-    dropRange.value = Math.max(0, Math.min(10, n));
-    dropNum.value = n;
-    dropVal.textContent = String(n);
-    commitState(!commit);
-  };
-  dropRange.oninput = () => setDrop(dropRange.value, false);
-  dropRange.onchange = () => commitState();
-  dropNum.oninput = () => setDrop(dropNum.value, false);
-  dropNum.onchange = () => commitState();
+  if (dropRange && dropNum && dropVal) {
+    const curDrop = conn.dropDepth ?? 1.8;
+    dropRange.value = Math.max(0, Math.min(10, curDrop));
+    dropNum.value = curDrop;
+    dropVal.textContent = String(curDrop);
+    const applyDrop = (val, fromRange) => {
+      const n = parseFloat(val);
+      if (Number.isNaN(n)) return;
+      conn.dropDepth = n;
+      dropRange.value = Math.max(0, Math.min(10, n));
+      if (fromRange) dropNum.value = n;
+      dropVal.textContent = String(n);
+      renderCanvasAndCode();
+    };
+    dropRange.oninput = () => applyDrop(dropRange.value, true);
+    dropRange.onchange = () => commitState();
+    dropNum.oninput = () => applyDrop(dropNum.value, false);
+    dropNum.onchange = () => commitState();
+  }
 
   const inDepthRange = document.getElementById('conn-indepth-range');
   const inDepthNum = document.getElementById('conn-indepth-num');
   const inDepthVal = document.getElementById('conn-indepth-val');
-  const curInD = conn.inDepth ?? 1.5;
-  inDepthRange.value = Math.max(0, Math.min(8, curInD));
-  inDepthNum.value = curInD;
-  inDepthVal.textContent = String(curInD);
-  const setInDepth = (val, commit) => {
-    const n = parseFloat(val);
-    if (Number.isNaN(n)) return;
-    conn.inDepth = n;
-    inDepthRange.value = Math.max(0, Math.min(8, n));
-    inDepthNum.value = n;
-    inDepthVal.textContent = String(n);
-    commitState(!commit);
-  };
-  inDepthRange.oninput = () => setInDepth(inDepthRange.value, false);
-  inDepthRange.onchange = () => commitState();
-  inDepthNum.oninput = () => setInDepth(inDepthNum.value, false);
-  inDepthNum.onchange = () => commitState();
+  if (inDepthRange && inDepthNum && inDepthVal) {
+    const curInD = conn.inDepth ?? 1.5;
+    inDepthRange.value = Math.max(0, Math.min(8, curInD));
+    inDepthNum.value = curInD;
+    inDepthVal.textContent = String(curInD);
+    const applyInDepth = (val, fromRange) => {
+      const n = parseFloat(val);
+      if (Number.isNaN(n)) return;
+      conn.inDepth = n;
+      inDepthRange.value = Math.max(0, Math.min(8, n));
+      if (fromRange) inDepthNum.value = n;
+      inDepthVal.textContent = String(n);
+      renderCanvasAndCode();
+    };
+    inDepthRange.oninput = () => applyInDepth(inDepthRange.value, true);
+    inDepthRange.onchange = () => commitState();
+    inDepthNum.oninput = () => applyInDepth(inDepthNum.value, false);
+    inDepthNum.onchange = () => commitState();
+  }
 
   const roundChk = document.getElementById('conn-rounded-chk');
-  roundChk.checked = conn.roundedCorners !== false;
-  roundChk.onchange = () => { conn.roundedCorners = roundChk.checked; commitState(); };
+  if (roundChk) {
+    roundChk.checked = conn.roundedCorners !== false;
+    roundChk.onchange = () => { conn.roundedCorners = roundChk.checked; commitState(); };
+  }
 
   // Curved controls
   document.querySelectorAll('#conn-curve-presets .pill-btn').forEach((btn) => {
@@ -794,11 +823,11 @@ function renderConnectorsInspector() {
   document.getElementById('conn-in-val').textContent = String(inR.value);
   document.getElementById('conn-loose-val').textContent = String(looseR.value);
 
-  outR.oninput = () => { conn.outAngle = parseFloat(outR.value); document.getElementById('conn-out-val').textContent = outR.value; commitState(true); };
+  outR.oninput = () => { conn.outAngle = parseFloat(outR.value); document.getElementById('conn-out-val').textContent = outR.value; renderCanvasAndCode(); };
   outR.onchange = () => commitState();
-  inR.oninput = () => { conn.inAngle = parseFloat(inR.value); document.getElementById('conn-in-val').textContent = inR.value; commitState(true); };
+  inR.oninput = () => { conn.inAngle = parseFloat(inR.value); document.getElementById('conn-in-val').textContent = inR.value; renderCanvasAndCode(); };
   inR.onchange = () => commitState();
-  looseR.oninput = () => { conn.looseness = parseFloat(looseR.value); document.getElementById('conn-loose-val').textContent = looseR.value; commitState(true); };
+  looseR.oninput = () => { conn.looseness = parseFloat(looseR.value); document.getElementById('conn-loose-val').textContent = looseR.value; renderCanvasAndCode(); };
   looseR.onchange = () => commitState();
 
   // Stroke / Anchors / Labels
@@ -841,7 +870,7 @@ function renderConnectorsInspector() {
   lblInp.value = conn.label || '';
   lblPos.value = conn.labelPos || 'below';
   lblIt.checked = conn.labelItalic !== false;
-  lblInp.oninput = () => { conn.label = lblInp.value; commitState(true); };
+  lblInp.oninput = () => { conn.label = lblInp.value; renderCanvasAndCode(); };
   lblInp.onchange = () => commitState();
   lblPos.onchange = () => { conn.labelPos = lblPos.value; commitState(); };
   lblIt.onchange = () => { conn.labelItalic = lblIt.checked; commitState(); };
@@ -883,10 +912,10 @@ function renderBracketsAndCalloutsInspector() {
 
     kindEl.onchange = () => { b.kind = kindEl.value; commitState(); };
     posEl.onchange = () => { b.position = posEl.value; commitState(); };
-    lblEl.oninput = () => { b.label = lblEl.value; commitState(true); };
+    lblEl.oninput = () => { b.label = lblEl.value; renderCanvasAndCode(); };
     lblEl.onchange = () => commitState();
     gChk.onchange = () => { b.dottedGuides = gChk.checked; commitState(); };
-    gRange.oninput = () => { b.guideHeight = parseFloat(gRange.value); gVal.textContent = gRange.value; commitState(true); };
+    gRange.oninput = () => { b.guideHeight = parseFloat(gRange.value); gVal.textContent = gRange.value; renderCanvasAndCode(); };
     gRange.onchange = () => commitState();
 
     syncColorControl(
@@ -954,7 +983,7 @@ function renderBracketsAndCalloutsInspector() {
   inEl.value = cal.inAngle ?? 225;
   document.getElementById('callout-curve-row').classList.toggle('hidden', cal.routing !== 'curved');
 
-  txtEl.oninput = () => { cal.text = txtEl.value; commitState(true); };
+  txtEl.oninput = () => { cal.text = txtEl.value; renderCanvasAndCode(); };
   txtEl.onchange = () => commitState();
   tgtEl.onchange = () => { cal.targetNodeId = tgtEl.value; commitState(); };
   sideEl.onchange = () => { cal.relPos = sideEl.value; commitState(); };

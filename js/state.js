@@ -126,20 +126,19 @@ export function makeNode(linesOrText = 'XP', children = [], opts = {}) {
 
 export function makeConnector(fromId, toId, opts = {}) {
   const dir = opts.direction || 'below';
-  const defOut = dir === 'above' ? 90 : dir === 'side' ? 0 : -90;
-  const defIn = dir === 'above' ? 90 : dir === 'side' ? 180 : -90;
+  const defRaMode = dir === 'above' ? 'u-above' : dir === 'side' ? 'l-bend' : 'u-below';
   return {
     id: genId('c'),
     fromId,
     toId,
     stylePreset: 'mvt',
     routing: 'right-angle', // 'right-angle' | 'curved' | 'straight'
+    raMode: defRaMode, // 'l-bend' | '7-bend' | 'u-below' | 'u-above' | 'c-left' | 'c-right'
     direction: dir, // 'below' | 'above' | 'side'
     dropDepth: 1.8,
-    inDepth: 1.5,
     roundedCorners: true,
-    outAngle: defOut,
-    inAngle: defIn,
+    outAngle: -90,
+    inAngle: -90,
     looseness: 1.0,
     fromAnchor: 'south',
     toAnchor: 'south',

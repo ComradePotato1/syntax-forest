@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>SyntaxForest — LaTeX Forest Syntax Tree Builder</title>
-  <link rel="stylesheet" href="styles.css?v=20261125c" />
+  <link rel="stylesheet" href="styles.css?v=20261125d" />
 </head>
 <body>
   <div id="app" class="app-shell">
@@ -374,45 +374,21 @@
             <!-- Right-angle controls -->
             <div id="conn-right-angle-opts" class="sub-box">
               <div class="field">
-                <span>Right-Angle Quick Presets</span>
-                <div class="preset-pills" id="conn-ra-presets">
-                  <button data-ra="below" class="pill-btn">Below (-90°)</button>
-                  <button data-ra="above" class="pill-btn">Above (90°)</button>
-                  <button data-ra="left" class="pill-btn">Left (180°)</button>
-                  <button data-ra="right" class="pill-btn">Right (0°)</button>
-                  <button data-ra="lstep" class="pill-btn">L-Step (-90°/180°)</button>
+                <span>Bend Shape</span>
+                <div class="preset-pills" id="conn-ra-modes">
+                  <button data-ramode="l-bend" class="pill-btn" title="Vertical first, then Horizontal (|-)">└ L-Bend (V→H)</button>
+                  <button data-ramode="7-bend" class="pill-btn" title="Horizontal first, then Vertical (-|)">┐ 7-Bend (H→V)</button>
+                  <button data-ramode="u-below" class="pill-btn" title="Drop down, across, then up">└─┘ U-Below</button>
+                  <button data-ramode="u-above" class="pill-btn" title="Rise up, across, then down">┌─┐ U-Above</button>
+                  <button data-ramode="c-left" class="pill-btn" title="Go left, vertical, then right">┌─└ C-Left</button>
+                  <button data-ramode="c-right" class="pill-btn" title="Go right, vertical, then left">┐─┘ C-Right</button>
                 </div>
               </div>
-              <div class="field-row two-col">
-                <div class="field">
-                  <span>Out Angle (<span id="conn-ra-out-val">-90</span>°)</span>
-                  <div class="color-combo">
-                    <input id="conn-ra-out-range" type="range" min="-180" max="180" step="5" value="-90" />
-                    <input id="conn-ra-out-num" type="number" min="-180" max="180" step="5" value="-90" style="width:54px" />
-                  </div>
-                </div>
-                <div class="field">
-                  <span>In Angle (<span id="conn-ra-in-val">-90</span>°)</span>
-                  <div class="color-combo">
-                    <input id="conn-ra-in-range" type="range" min="-180" max="180" step="5" value="-90" />
-                    <input id="conn-ra-in-num" type="number" min="-180" max="180" step="5" value="-90" style="width:54px" />
-                  </div>
-                </div>
-              </div>
-              <div class="field-row two-col">
-                <div class="field">
-                  <span>Drop / Height (<span id="conn-drop-val">1.8</span>em)</span>
-                  <div class="color-combo">
-                    <input id="conn-drop-range" type="range" min="0" max="10" step="0.25" value="1.8" />
-                    <input id="conn-drop-num" type="number" step="0.1" value="1.8" style="width:54px" title="Any drop/height in em (positive or negative)" />
-                  </div>
-                </div>
-                <div class="field">
-                  <span>In Stub (<span id="conn-indepth-val">1.5</span>em)</span>
-                  <div class="color-combo">
-                    <input id="conn-indepth-range" type="range" min="0" max="8" step="0.25" value="1.5" />
-                    <input id="conn-indepth-num" type="number" step="0.1" value="1.5" style="width:54px" title="Target entry leg length when Out and In angles differ" />
-                  </div>
+              <div id="conn-drop-wrap" class="field">
+                <span>Drop / Height (<span id="conn-drop-val">1.8</span>em)</span>
+                <div class="color-combo">
+                  <input id="conn-drop-range" type="range" min="0" max="10" step="0.25" value="1.8" />
+                  <input id="conn-drop-num" type="number" step="0.1" value="1.8" style="width:62px" title="Any drop/height in em (positive or negative)" />
                 </div>
               </div>
               <label class="checkbox-row">
@@ -777,6 +753,6 @@
     </div>
   </div>
 
-  <script type="module" src="js/app.js?v=20261125c"></script>
+  <script type="module" src="js/app.js?v=20261125d"></script>
 </body>
 </html>

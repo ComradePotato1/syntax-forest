@@ -1,4 +1,4 @@
-import { colorToCss } from './state.js?v=20261125c';
+import { colorToCss } from './state.js?v=20261125d';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
@@ -543,40 +543,36 @@ export function renderTreeSvg(svg, state, ui) {
 
     if (c.routing === 'right-angle') {
       const dropPx = (c.dropDepth != null ? c.dropDepth : 1.8) * 15;
-      const inStubPx = (c.inDepth != null ? c.inDepth : 1.5) * 15;
-      const outA = c.outAngle ?? (c.direction === 'above' ? 90 : c.direction === 'side' ? 0 : -90);
-      const inA = c.inAngle ?? (c.direction === 'above' ? 90 : c.direction === 'side' ? 180 : -90);
-      const isAng = (a, t) => Math.abs((((a - t) % 360) + 540) % 360 - 180) < 1;
+      const raMode = c.raMode || (c.direction === 'above' ? 'u-above' : c.direction === 'side' ? 'l-bend' : 'u-below');
 
       let pts = [];
-      if (isAng(outA, -90) && isAng(inA, -90)) {
-        const midY = p1.y + dropPx;
-        pts = [p1, { x: p1.x, y: midY }, { x: p2.x, y: midY }, p2];
-        labelPt = { x: (p1.x + p2.x) / 2, y: midY };
-      } else if (isAng(outA, 90) && isAng(inA, 90)) {
+      if (raMode === 'l-bend') {
+        // Vertical first, then Horizontal (|-)
+        const corner = { x: p1.x, y: p2.y };
+        pts = [p1, corner, p2];
+        labelPt = { x: (corner.x + p2.x) / 2, y: p2.y };
+      } else if (raMode === '7-bend') {
+        // Horizontal first, then Vertical (-|)
+        const corner = { x: p2.x, y: p1.y };
+        pts = [p1, corner, p2];
+        labelPt = { x: (p1.x + corner.x) / 2, y: p1.y };
+      } else if (raMode === 'u-above') {
         const midY = p1.y - dropPx;
         pts = [p1, { x: p1.x, y: midY }, { x: p2.x, y: midY }, p2];
         labelPt = { x: (p1.x + p2.x) / 2, y: midY };
-      } else if (isAng(outA, 0) && isAng(inA, 0)) {
-        const midX = p1.x + dropPx;
-        pts = [p1, { x: midX, y: p1.y }, { x: midX, y: p2.y }, p2];
-        labelPt = { x: midX, y: (p1.y + p2.y) / 2 };
-      } else if (isAng(outA, 180) && isAng(inA, 180)) {
+      } else if (raMode === 'c-left') {
         const midX = p1.x - dropPx;
         pts = [p1, { x: midX, y: p1.y }, { x: midX, y: p2.y }, p2];
         labelPt = { x: midX, y: (p1.y + p2.y) / 2 };
+      } else if (raMode === 'c-right') {
+        const midX = p1.x + dropPx;
+        pts = [p1, { x: midX, y: p1.y }, { x: midX, y: p2.y }, p2];
+        labelPt = { x: midX, y: (p1.y + p2.y) / 2 };
       } else {
-        const radOut = (outA * Math.PI) / 180;
-        const radIn = (inA * Math.PI) / 180;
-        // SVG +y is downward, so negate sin(angle)
-        const q1 = { x: p1.x + dropPx * Math.cos(radOut), y: p1.y - dropPx * Math.sin(radOut) };
-        const q2 = Math.abs(inStubPx) < 0.5
-          ? p2
-          : { x: p2.x + inStubPx * Math.cos(radIn), y: p2.y - inStubPx * Math.sin(radIn) };
-        const horizFirst = Math.abs(Math.cos(radIn)) >= Math.abs(Math.sin(radIn));
-        const corner = horizFirst ? { x: q2.x, y: q1.y } : { x: q1.x, y: q2.y };
-        pts = q2 === p2 ? [p1, q1, corner, p2] : [p1, q1, corner, q2, p2];
-        labelPt = { x: (q1.x + corner.x) / 2, y: (q1.y + corner.y) / 2 };
+        // u-below
+        const midY = p1.y + dropPx;
+        pts = [p1, { x: p1.x, y: midY }, { x: p2.x, y: midY }, p2];
+        labelPt = { x: (p1.x + p2.x) / 2, y: midY };
       }
 
       if (c.roundedCorners !== false && pts.length > 2) {

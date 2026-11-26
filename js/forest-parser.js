@@ -1,4 +1,4 @@
-import { makeNode, makeLine, makeFeatureLine, makeConnector, makeCallout } from './state.js?v=20261125c';
+import { makeNode, makeLine, makeFeatureLine, makeConnector, makeCallout } from './state.js?v=20261125d';
 
 /**
  * Parses a \begin{forest}...\end{forest} block (or raw bracket tree) into our TreeState.
@@ -349,6 +349,7 @@ export function parseForestLatex(rawInput) {
     if (!fromId || !toId) continue;
 
     let routing = 'straight';
+    let raMode = 'u-below';
     let direction = 'below';
     let dropDepth = 1.8;
     let outAngle = -90;
@@ -362,29 +363,16 @@ export function parseForestLatex(rawInput) {
         const dx = parseFloat(stepM[1]);
         const dy = parseFloat(stepM[2]);
         dropDepth = +(Math.hypot(dx, dy)).toFixed(2);
-        outAngle = Math.round((Math.atan2(dy, dx) * 180) / Math.PI);
         if (Math.abs(dx) < 0.01) {
           direction = dy < 0 ? 'below' : 'above';
-          inAngle = outAngle;
-        } else if (Math.abs(dy) < 0.01) {
+          raMode = dy < 0 ? 'u-below' : 'u-above';
+        } else {
           direction = 'side';
-          inAngle = outAngle;
+          raMode = dx < 0 ? 'c-left' : 'c-right';
         }
-      } else if (!body.includes('++')) {
+      } else {
         direction = 'side';
-        outAngle = 0;
-        inAngle = 180;
-      }
-      // Check if there is an intermediate stub coordinate before final --
-      if (coords.length >= 3) {
-        const stub = coords[1];
-        const xm = stub.shift.match(/xshift=(-?[0-9.]+)em/);
-        const ym = stub.shift.match(/yshift=(-?[0-9.]+)em/);
-        const sx = xm ? parseFloat(xm[1]) : 0;
-        const sy = ym ? parseFloat(ym[1]) : 0;
-        if (sx !== 0 || sy !== 0) {
-          inAngle = Math.round((Math.atan2(sy, sx) * 180) / Math.PI);
-        }
+        raMode = body.includes('|-') ? 'l-bend' : '7-bend';
       }
     } else if (body.includes('to[')) {
       routing = 'curved';
@@ -431,6 +419,7 @@ export function parseForestLatex(rawInput) {
 
     connectors.push(makeConnector(fromId, toId, {
       routing,
+      raMode,
       direction,
       dropDepth,
       outAngle,

@@ -14,11 +14,11 @@ import {
   unwrapNodeById,
   insertParentAbove,
   HistoryManager,
-} from './state.js?v=20261125c';
-import { buildPreset } from './presets.js?v=20261125c';
-import { generateForestLatex } from './latex-gen.js?v=20261125c';
-import { parseForestLatex } from './forest-parser.js?v=20261125c';
-import { renderTreeSvg } from './renderer.js?v=20261125c';
+} from './state.js?v=20261125d';
+import { buildPreset } from './presets.js?v=20261125d';
+import { generateForestLatex } from './latex-gen.js?v=20261125d';
+import { parseForestLatex } from './forest-parser.js?v=20261125d';
+import { renderTreeSvg } from './renderer.js?v=20261125d';
 
 const STORAGE_KEY = 'syntaxforest_autosave_v1';
 const SAVED_TREES_KEY = 'syntaxforest_saved_trees_v1';
@@ -676,71 +676,46 @@ function renderConnectorsInspector() {
   document.getElementById('conn-right-angle-opts').classList.toggle('hidden', conn.routing !== 'right-angle');
   document.getElementById('conn-curved-opts').classList.toggle('hidden', conn.routing !== 'curved');
 
-  // Right angle controls (Out Angle, In Angle, Flexible Drop/Height, In Stub)
-  document.querySelectorAll('#conn-ra-presets .pill-btn').forEach((btn) => {
+  // Right angle controls (L-bend, 7-bend, U/C bends & flexible Drop/Height)
+  const curRaMode = conn.raMode || (conn.direction === 'above' ? 'u-above' : conn.direction === 'side' ? 'l-bend' : 'u-below');
+  document.querySelectorAll('#conn-ra-modes .pill-btn').forEach((btn) => {
+    btn.classList.toggle('active', btn.dataset.ramode === curRaMode);
     btn.onclick = () => {
-      const p = btn.dataset.ra;
-      if (p === 'below') {
-        conn.direction = 'below'; conn.outAngle = -90; conn.inAngle = -90;
-        conn.fromAnchor = 'south'; conn.toAnchor = 'south';
-      } else if (p === 'above') {
-        conn.direction = 'above'; conn.outAngle = 90; conn.inAngle = 90;
-        conn.fromAnchor = 'north'; conn.toAnchor = 'north';
-      } else if (p === 'left') {
-        conn.direction = 'side'; conn.outAngle = 180; conn.inAngle = 180;
-        conn.fromAnchor = 'west'; conn.toAnchor = 'west';
-      } else if (p === 'right') {
-        conn.direction = 'side'; conn.outAngle = 0; conn.inAngle = 0;
-        conn.fromAnchor = 'east'; conn.toAnchor = 'east';
-      } else if (p === 'lstep') {
-        conn.direction = 'side'; conn.outAngle = -90; conn.inAngle = 180;
-        conn.fromAnchor = 'south'; conn.toAnchor = 'west';
+      const m = btn.dataset.ramode;
+      conn.raMode = m;
+      const fm = ui.lastLayout?.meta?.get(conn.fromId)?.nodeBox;
+      const tm = ui.lastLayout?.meta?.get(conn.toId)?.nodeBox;
+      if (m === 'l-bend') {
+        conn.direction = 'side';
+        if (fm && tm) {
+          conn.fromAnchor = tm.cy >= fm.cy ? 'south' : 'north';
+          conn.toAnchor = tm.cx >= fm.cx ? 'west' : 'east';
+        } else {
+          conn.fromAnchor = 'south'; conn.toAnchor = 'west';
+        }
+      } else if (m === '7-bend') {
+        conn.direction = 'side';
+        if (fm && tm) {
+          conn.fromAnchor = tm.cx >= fm.cx ? 'east' : 'west';
+          conn.toAnchor = tm.cy >= fm.cy ? 'north' : 'south';
+        } else {
+          conn.fromAnchor = 'east'; conn.toAnchor = 'north';
+        }
+      } else if (m === 'u-below') {
+        conn.direction = 'below'; conn.fromAnchor = 'south'; conn.toAnchor = 'south';
+      } else if (m === 'u-above') {
+        conn.direction = 'above'; conn.fromAnchor = 'north'; conn.toAnchor = 'north';
+      } else if (m === 'c-left') {
+        conn.direction = 'side'; conn.fromAnchor = 'west'; conn.toAnchor = 'west';
+      } else if (m === 'c-right') {
+        conn.direction = 'side'; conn.fromAnchor = 'east'; conn.toAnchor = 'east';
       }
       commitState();
     };
   });
 
-  const raOutR = document.getElementById('conn-ra-out-range');
-  const raOutN = document.getElementById('conn-ra-out-num');
-  const raOutV = document.getElementById('conn-ra-out-val');
-  const raInR = document.getElementById('conn-ra-in-range');
-  const raInN = document.getElementById('conn-ra-in-num');
-  const raInV = document.getElementById('conn-ra-in-val');
-  if (raOutR && raOutN && raOutV && raInR && raInN && raInV) {
-    const curOut = conn.outAngle ?? -90;
-    const curIn = conn.inAngle ?? -90;
-    raOutR.value = curOut; raOutN.value = curOut; raOutV.textContent = String(curOut);
-    raInR.value = curIn; raInN.value = curIn; raInV.textContent = String(curIn);
-
-    const applyRaOut = (val, fromRange) => {
-      const parsed = parseFloat(val);
-      if (Number.isNaN(parsed)) return;
-      const n = Math.max(-180, Math.min(180, parsed));
-      conn.outAngle = n;
-      raOutR.value = n;
-      if (fromRange) raOutN.value = n;
-      raOutV.textContent = String(n);
-      renderCanvasAndCode();
-    };
-    const applyRaIn = (val, fromRange) => {
-      const parsed = parseFloat(val);
-      if (Number.isNaN(parsed)) return;
-      const n = Math.max(-180, Math.min(180, parsed));
-      conn.inAngle = n;
-      raInR.value = n;
-      if (fromRange) raInN.value = n;
-      raInV.textContent = String(n);
-      renderCanvasAndCode();
-    };
-    raOutR.oninput = () => applyRaOut(raOutR.value, true);
-    raOutR.onchange = () => commitState();
-    raOutN.oninput = () => applyRaOut(raOutN.value, false);
-    raOutN.onchange = () => commitState();
-    raInR.oninput = () => applyRaIn(raInR.value, true);
-    raInR.onchange = () => commitState();
-    raInN.oninput = () => applyRaIn(raInN.value, false);
-    raInN.onchange = () => commitState();
-  }
+  const dropWrap = document.getElementById('conn-drop-wrap');
+  if (dropWrap) dropWrap.classList.toggle('hidden', curRaMode === 'l-bend' || curRaMode === '7-bend');
 
   const dropRange = document.getElementById('conn-drop-range');
   const dropNum = document.getElementById('conn-drop-num');
@@ -763,29 +738,6 @@ function renderConnectorsInspector() {
     dropRange.onchange = () => commitState();
     dropNum.oninput = () => applyDrop(dropNum.value, false);
     dropNum.onchange = () => commitState();
-  }
-
-  const inDepthRange = document.getElementById('conn-indepth-range');
-  const inDepthNum = document.getElementById('conn-indepth-num');
-  const inDepthVal = document.getElementById('conn-indepth-val');
-  if (inDepthRange && inDepthNum && inDepthVal) {
-    const curInD = conn.inDepth ?? 1.5;
-    inDepthRange.value = Math.max(0, Math.min(8, curInD));
-    inDepthNum.value = curInD;
-    inDepthVal.textContent = String(curInD);
-    const applyInDepth = (val, fromRange) => {
-      const n = parseFloat(val);
-      if (Number.isNaN(n)) return;
-      conn.inDepth = n;
-      inDepthRange.value = Math.max(0, Math.min(8, n));
-      if (fromRange) inDepthNum.value = n;
-      inDepthVal.textContent = String(n);
-      renderCanvasAndCode();
-    };
-    inDepthRange.oninput = () => applyInDepth(inDepthRange.value, true);
-    inDepthRange.onchange = () => commitState();
-    inDepthNum.oninput = () => applyInDepth(inDepthNum.value, false);
-    inDepthNum.onchange = () => commitState();
   }
 
   const roundChk = document.getElementById('conn-rounded-chk');

@@ -108,11 +108,15 @@ custom.connectors.push(makeConnector(childA.id, childB.id, {
   arrowHead: '<->', linePattern: 'dashed', color: '#7c3aed', label: 'Curved Link',
 }));
 custom.connectors.push(makeConnector(childA.id, childB.children[0].id, {
-  routing: 'right-angle', outAngle: -90, inAngle: 180, dropDepth: 6.5, inDepth: 1.5,
+  routing: 'right-angle', raMode: 'l-bend',
   fromAnchor: 'south', toAnchor: 'west', arrowHead: '->', color: 'blue',
 }));
+custom.connectors.push(makeConnector(childA.id, childB.children[1].id, {
+  routing: 'right-angle', raMode: '7-bend',
+  fromAnchor: 'east', toAnchor: 'north', arrowHead: '->', color: 'teal',
+}));
 custom.connectors.push(makeConnector(childB.children[1].id, childA.id, {
-  routing: 'right-angle', outAngle: 180, inAngle: 180, dropDepth: 3.25,
+  routing: 'right-angle', raMode: 'c-left', dropDepth: 3.25,
   fromAnchor: 'west', toAnchor: 'west', arrowHead: '->', linePattern: 'dotted',
 }));
 custom.callouts.push(makeCallout(childB.id, '\\textit{note}', {
@@ -125,6 +129,7 @@ assert(customLayout.meta.size >= 4, 'Custom layout rendered');
 const customLatex = generateForestLatex(custom);
 assert(customLatex.startsWith('\\begin{forest}') && customLatex.endsWith('\\end{forest}'), 'Custom tree strictly forest block');
 assert(customLatex.includes('s sep=2.5em') && customLatex.includes('l sep=1.75em'), 'Per-branch s sep and l sep emitted');
+assert(customLatex.includes(') |- (') && customLatex.includes(') -| ('), 'Right-angle L-bend and 7-bend emitted');
 assert(customLatex.includes('++(-3.25em, 0) |-'), 'Right-angle left C-route emitted');
 const parsedCustom = parseForestLatex(customLatex);
 assert(parsedCustom.root.children[1].sSep === '2.5em', 'Per-branch sSep round-tripped');

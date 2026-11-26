@@ -1,0 +1,9 @@
+__pycache__/
+*.py[cod]
+*.log
+*.aux
+*.pdf
+.DS_Store
+instructions.tex
+instructions.pdf
+ling-200b.cls

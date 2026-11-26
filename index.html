@@ -1,0 +1,735 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SyntaxForest — LaTeX Forest Syntax Tree Builder (LING 200B)</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="app" class="app-shell">
+    <!-- TOP BAR -->
+    <header class="topbar">
+      <div class="topbar-left">
+        <div class="brand">
+          <span class="brand-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="4" r="2.2"/>
+              <circle cx="6" cy="13" r="2.2"/>
+              <circle cx="18" cy="13" r="2.2"/>
+              <circle cx="13" cy="20" r="2"/>
+              <circle cx="21" cy="20" r="2"/>
+              <path d="M10.8 5.8 7.2 11.2M13.2 5.8 16.8 11.2M17 15l-2.8 3.3M19 15l1.3 3.2"/>
+            </svg>
+          </span>
+          <div>
+            <div class="brand-title">SyntaxForest</div>
+            <div class="brand-sub">LaTeX <code>forest</code> &amp; <code>ling-200b</code> Studio</div>
+          </div>
+        </div>
+
+        <div class="divider-v"></div>
+
+        <label class="preset-select-wrap" title="Load a template or an example from instructions.tex">
+          <span class="sr-only">Preset Template</span>
+          <select id="preset-select" class="select-compact">
+            <option value="" disabled selected>Load Example / Template…</option>
+            <option value="blank">Blank CP / TP Tree</option>
+            <option value="ex11">Ex (11) Feature Checking &amp; Projection (I have drawn a tree)</option>
+            <option value="ex12">Ex (12) Simple Clause (Everyone should eat kale)</option>
+            <option value="ex13">Ex (13) Affix Hopping — Dashed Right-Angle Arrow</option>
+            <option value="ex14">Ex (14) Head Mvt + Braces + Dotted Lines + Unpronounced</option>
+            <option value="ex15">Ex (15) Do-Support — Curved Callout Arrow</option>
+            <option value="wh_roof">Wh-Movement with Triangle (Roof) &amp; Curved Arrow</option>
+            <option value="agree_bind">Agree &amp; Binding Relations (o···o &amp; o—o)</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="topbar-center">
+        <div class="mode-switch" role="group" aria-label="Editor interaction mode">
+          <button id="mode-select-btn" class="mode-btn active" data-mode="select" title="Select, edit, and add nodes (Esc)">
+            <svg viewBox="0 0 20 20" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 3l12 6.5-5.5 1.8L8.7 17 4 3z"/></svg>
+            Select / Edit
+          </button>
+          <button id="mode-connect-btn" class="mode-btn" data-mode="connect" title="Click source node, then target node to draw an arrow or line (C)">
+            <svg viewBox="0 0 20 20" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 14v2.5h12V6.5"/><path d="M13.5 9 16 6l2.5 3"/></svg>
+            Draw Arrow / Line
+          </button>
+        </div>
+
+        <div class="divider-v"></div>
+
+        <div class="history-btns">
+          <button id="undo-btn" class="icon-btn" title="Undo (Ctrl+Z)" disabled>↶ Undo</button>
+          <button id="redo-btn" class="icon-btn" title="Redo (Ctrl+Y)" disabled>↷ Redo</button>
+        </div>
+      </div>
+
+      <div class="topbar-right">
+        <button id="import-btn" class="btn btn-ghost" title="Paste existing \begin{forest}...\end{forest} code">Import LaTeX</button>
+        <button id="export-svg-btn" class="btn btn-ghost" title="Download vector SVG of the tree">Export SVG</button>
+        <button id="compile-pdf-btn" class="btn btn-accent-outline hidden" title="Compile snippet with pdflatex to verify exact LaTeX rendering">
+          LaTeX Render
+        </button>
+        <button id="copy-latex-top-btn" class="btn btn-primary" title="Copy \begin{forest}...\end{forest} to clipboard">
+          Copy Forest Code
+        </button>
+        <button id="help-btn" class="icon-btn" title="Keyboard shortcuts &amp; guide">?</button>
+      </div>
+    </header>
+
+    <!-- MAIN WORKSPACE -->
+    <div class="workspace">
+      <!-- LEFT PALETTE -->
+      <aside class="left-panel">
+        <section class="palette-section">
+          <div class="section-header">Node Actions</div>
+          <div class="action-grid">
+            <button id="act-add-child" class="pal-btn pal-btn-primary" title="Add child branch to selected node (Enter)">+ Child</button>
+            <button id="act-insert-parent" class="pal-btn" title="Insert a new parent branch above selected node (P)">+ Insert Above</button>
+            <button id="act-add-sib-left" class="pal-btn" title="Add sibling to the left">← + Sibling</button>
+            <button id="act-add-sib-right" class="pal-btn" title="Add sibling to the right">+ Sibling →</button>
+            <button id="act-move-left" class="pal-btn" title="Move selected branch left">⇠ Move Left</button>
+            <button id="act-move-right" class="pal-btn" title="Move selected branch right">Move Right ⇢</button>
+            <button id="act-dup-node" class="pal-btn" title="Duplicate subtree">Duplicate</button>
+            <button id="act-del-node" class="pal-btn pal-btn-danger" title="Delete node (Del)">Delete</button>
+          </div>
+          <div class="action-subrow">
+            <button id="act-del-keep-children" class="btn-link" title="Remove selected node and promote its children to its parent">
+              Unwrap node (keep children)
+            </button>
+          </div>
+        </section>
+
+        <section class="palette-section">
+          <div class="section-header">
+            <span>Categories</span>
+            <select id="cat-insert-mode" class="mini-select" title="Choose whether clicking a chip adds a child or sets current node label">
+              <option value="child">+ as Child</option>
+              <option value="replace">Set Label</option>
+              <option value="parent">+ Insert Above</option>
+            </select>
+          </div>
+          <div id="category-chips" class="chip-grid"></div>
+        </section>
+
+        <section class="palette-section">
+          <div class="section-header">Linguistic Macros &amp; Symbols</div>
+          <div class="hint-text">Click to append line to selected node (or insert into active text box)</div>
+          <div id="symbol-chips" class="chip-grid"></div>
+        </section>
+
+        <section class="palette-section">
+          <div class="section-header">Quick Features</div>
+          <div class="hint-text">Click to add feature to selected node</div>
+          <div id="feature-chips" class="chip-grid"></div>
+        </section>
+      </aside>
+
+      <!-- CENTER CANVAS + CODE DRAWER -->
+      <main class="center-area">
+        <div id="canvas-wrap" class="canvas-wrap">
+          <!-- Mode / Connect Banner -->
+          <div id="connect-banner" class="connect-banner hidden">
+            <span id="connect-banner-text">Click the <strong>source node</strong> where the arrow starts…</span>
+            <button id="connect-cancel-btn" class="btn-mini">Cancel (Esc)</button>
+          </div>
+
+          <!-- Canvas Top Floating Controls -->
+          <div class="canvas-controls">
+            <button id="zoom-out-btn" class="ctrl-btn" title="Zoom out">−</button>
+            <span id="zoom-label" class="zoom-label">100%</span>
+            <button id="zoom-in-btn" class="ctrl-btn" title="Zoom in">+</button>
+            <button id="zoom-fit-btn" class="ctrl-btn" title="Fit tree to view">Fit</button>
+            <div class="ctrl-sep"></div>
+            <button id="toggle-grid-btn" class="ctrl-btn active" title="Toggle drafting grid">Grid</button>
+          </div>
+
+          <!-- SVG Viewport -->
+          <svg id="tree-svg" class="tree-svg" tabindex="0">
+            <defs>
+              <pattern id="draft-grid" width="24" height="24" patternUnits="userSpaceOnUse">
+                <path d="M 24 0 L 0 0 0 24" fill="none" stroke="rgba(148,163,184,0.16)" stroke-width="1"/>
+              </pattern>
+            </defs>
+            <rect id="svg-bg" width="100%" height="100%" fill="url(#draft-grid)" />
+            <g id="viewport-group">
+              <g id="layer-brackets"></g>
+              <g id="layer-edges"></g>
+              <g id="layer-nodes"></g>
+              <g id="layer-connectors"></g>
+              <g id="layer-callouts"></g>
+              <g id="layer-overlay"></g>
+            </g>
+          </svg>
+
+          <!-- Floating Contextual Node Quick-Bar -->
+          <div id="node-float-bar" class="node-float-bar hidden">
+            <button data-q="child" title="Add child (Enter)">+ Child</button>
+            <button data-q="parent" title="Insert parent above (P)">+ Above</button>
+            <button data-q="arrow" title="Draw arrow from this node">↗ Arrow</button>
+            <button data-q="brace" title="Toggle subtree under-brace">{ } Brace</button>
+            <button data-q="roof" title="Toggle triangle (roof) branch">△ Roof</button>
+            <button data-q="unpronounced" title="Toggle unpronounced (gray)">∅ Gray</button>
+            <button data-q="delete" class="danger" title="Delete node">✕</button>
+          </div>
+
+          <!-- Inline Node Quick-Edit Popover -->
+          <div id="inline-edit-pop" class="inline-edit-pop hidden">
+            <input id="inline-edit-input" type="text" placeholder="Node label (e.g. TP, \xbar{T})" />
+            <button id="inline-edit-ok" class="btn-mini btn-mini-primary">OK</button>
+          </div>
+        </div>
+
+        <!-- BOTTOM LATEX DRAWER -->
+        <section id="latex-drawer" class="latex-drawer">
+          <div class="drawer-header">
+            <div class="drawer-title-group">
+              <span class="drawer-title">Generated LaTeX Output</span>
+              <span class="badge-scope">\begin{forest} … \end{forest} only</span>
+              <span id="copy-toast" class="copy-toast hidden">Copied to clipboard!</span>
+            </div>
+            <div class="drawer-actions">
+              <button id="drawer-import-btn" class="btn-mini">Paste / Import</button>
+              <button id="drawer-download-btn" class="btn-mini">Download .tex</button>
+              <button id="drawer-copy-btn" class="btn-mini btn-mini-primary">Copy Code</button>
+              <button id="drawer-toggle-btn" class="btn-mini" title="Collapse or expand code drawer">▾</button>
+            </div>
+          </div>
+          <pre id="latex-output" class="latex-output" aria-label="Generated LaTeX forest code"></pre>
+        </section>
+      </main>
+
+      <!-- RIGHT INSPECTOR -->
+      <aside class="right-panel">
+        <div class="tabs" role="tablist">
+          <button class="tab-btn active" data-tab="node" role="tab">Node</button>
+          <button class="tab-btn" data-tab="connectors" role="tab">
+            Arrows <span id="conn-count-badge" class="tab-badge">0</span>
+          </button>
+          <button class="tab-btn" data-tab="brackets" role="tab">Brackets &amp; Notes</button>
+          <button class="tab-btn" data-tab="tree" role="tab">Tree</button>
+        </div>
+
+        <!-- TAB: NODE -->
+        <div id="tab-node" class="tab-pane active">
+          <div id="no-node-msg" class="empty-msg hidden">Click any node on the tree to edit its label, features, colors, and branches.</div>
+          <div id="node-inspector-body">
+            <div class="field-row two-col">
+              <label class="field">
+                <span>TikZ Node Name</span>
+                <input id="node-name-input" type="text" placeholder="auto (optional)" />
+              </label>
+              <label class="field">
+                <span>Node Font Color</span>
+                <div class="color-combo">
+                  <select id="node-color-select"></select>
+                  <input id="node-color-custom" type="color" value="#1e293b" title="Custom node text color" />
+                </div>
+              </label>
+            </div>
+
+            <div class="inspector-block">
+              <div class="block-header">
+                <span>Lines &amp; Features (<code>\\</code>)</span>
+                <div class="block-header-btns">
+                  <button id="add-line-btn" class="btn-mini">+ Line</button>
+                  <button id="add-feature-btn" class="btn-mini btn-mini-accent">+ Feature</button>
+                </div>
+              </div>
+              <div id="lines-list" class="lines-list"></div>
+            </div>
+
+            <div class="inspector-block">
+              <div class="block-header"><span>Branch &amp; Subtree Style</span></div>
+              <div class="field-row two-col">
+                <label class="field">
+                  <span>Branch to Parent</span>
+                  <select id="node-edge-select">
+                    <option value="solid">Solid (semithick)</option>
+                    <option value="roof">Triangle (roof)</option>
+                    <option value="dotted">Dotted</option>
+                    <option value="dashed">Dashed</option>
+                    <option value="thick">Thick</option>
+                    <option value="none">No Branch (hidden)</option>
+                  </select>
+                </label>
+                <label class="field">
+                  <span>Branch Color</span>
+                  <div class="color-combo">
+                    <select id="node-edge-color-select"></select>
+                    <input id="node-edge-color-custom" type="color" value="#1e293b" title="Custom branch color" />
+                  </div>
+                </label>
+              </div>
+              <label class="checkbox-row">
+                <input id="node-unpronounced-chk" type="checkbox" />
+                <span><strong>Unpronounced subtree</strong> (<code>unpronounced</code> — gray text &amp; branches)</span>
+              </label>
+            </div>
+
+            <div class="inspector-block">
+              <div class="block-header">
+                <span>Projected Feature (<code>proj-feature</code>)</span>
+                <input id="proj-feature-chk" type="checkbox" title="Attach a projected feature to the right of this node (like Ex 11)" />
+              </div>
+              <div id="proj-feature-fields" class="hidden">
+                <div class="field-row three-col">
+                  <label class="field">
+                    <span>Type</span>
+                    <select id="proj-feat-kind">
+                      <option value="mf">Merge [•X•]</option>
+                      <option value="hf">Head [+X+]</option>
+                      <option value="af">Agree [⋆X⋆]</option>
+                      <option value="mvf">Mvt [∧X∧]</option>
+                      <option value="feature">Plain [X]</option>
+                    </select>
+                  </label>
+                  <label class="field">
+                    <span>Value</span>
+                    <input id="proj-feat-text" type="text" placeholder="d" />
+                  </label>
+                  <label class="field checkbox-field">
+                    <span>Satisfied ✓</span>
+                    <input id="proj-feat-sat" type="checkbox" />
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB: ARROWS / CONNECTORS -->
+        <div id="tab-connectors" class="tab-pane">
+          <div class="inspector-block">
+            <div class="block-header">
+              <span>Arrows &amp; Lines</span>
+              <div class="block-header-btns">
+                <button id="conn-draw-mode-btn" class="btn-mini btn-mini-primary">+ Draw on Tree</button>
+                <button id="conn-add-manual-btn" class="btn-mini">+ Add</button>
+              </div>
+            </div>
+            <div id="connectors-list" class="item-list"></div>
+          </div>
+
+          <div id="conn-editor" class="inspector-block hidden">
+            <div class="block-header">
+              <span>Edit Selected Connector</span>
+              <button id="conn-delete-btn" class="btn-mini btn-mini-danger">Delete</button>
+            </div>
+
+            <div class="field-row conn-endpoints">
+              <label class="field">
+                <span>From Node</span>
+                <select id="conn-from-select"></select>
+              </label>
+              <button id="conn-swap-btn" class="btn-mini swap-btn" title="Swap direction">⇄</button>
+              <label class="field">
+                <span>To Node</span>
+                <select id="conn-to-select"></select>
+              </label>
+            </div>
+
+            <div class="field">
+              <span>Style Preset</span>
+              <div class="preset-pills" id="conn-style-pills">
+                <button data-cpreset="mvt" class="pill-btn">Movement →</button>
+                <button data-cpreset="mvt-dashed" class="pill-btn">Dashed Mvt ⇢</button>
+                <button data-cpreset="agree" class="pill-btn">Agree ○···○</button>
+                <button data-cpreset="binding" class="pill-btn">Binding ○—○</button>
+                <button data-cpreset="dotted" class="pill-btn">Dotted →</button>
+              </div>
+            </div>
+
+            <!-- LINE GEOMETRY: RIGHT ANGLE vs CURVED vs STRAIGHT -->
+            <div class="field">
+              <span>Line Shape / Geometry</span>
+              <div class="seg-3" id="conn-routing-seg">
+                <button data-routing="right-angle" class="seg-btn active">Right Angles</button>
+                <button data-routing="curved" class="seg-btn">Curved</button>
+                <button data-routing="straight" class="seg-btn">Straight</button>
+              </div>
+            </div>
+
+            <!-- Right-angle controls -->
+            <div id="conn-right-angle-opts" class="sub-box">
+              <div class="field-row two-col">
+                <label class="field">
+                  <span>Route Side</span>
+                  <select id="conn-direction">
+                    <option value="below">Below Nodes (south)</option>
+                    <option value="above">Above Nodes (north)</option>
+                    <option value="side">Horizontal / Orthogonal</option>
+                  </select>
+                </label>
+                <label class="field">
+                  <span>Drop / Height (<span id="conn-drop-val">2</span>em)</span>
+                  <input id="conn-drop-range" type="range" min="0.5" max="5.5" step="0.25" value="2" />
+                </label>
+              </div>
+              <label class="checkbox-row">
+                <input id="conn-rounded-chk" type="checkbox" checked />
+                <span>Slightly rounded corners (<code>rounded corners=1pt</code>)</span>
+              </label>
+            </div>
+
+            <!-- Curved controls -->
+            <div id="conn-curved-opts" class="sub-box hidden">
+              <div class="field">
+                <span>Curve Quick Arcs</span>
+                <div class="preset-pills" id="conn-curve-presets">
+                  <button data-carc="below" class="pill-btn">Arc Below</button>
+                  <button data-carc="above" class="pill-btn">Arc Above</button>
+                  <button data-carc="left" class="pill-btn">Arc Left</button>
+                  <button data-carc="right" class="pill-btn">Arc Right</button>
+                  <button data-carc="scurve" class="pill-btn">S-Curve</button>
+                </div>
+              </div>
+              <div class="field-row two-col">
+                <label class="field">
+                  <span>Out Angle (<span id="conn-out-val">-90</span>°)</span>
+                  <input id="conn-out-range" type="range" min="-180" max="180" step="5" value="-90" />
+                </label>
+                <label class="field">
+                  <span>In Angle (<span id="conn-in-val">-90</span>°)</span>
+                  <input id="conn-in-range" type="range" min="-180" max="180" step="5" value="-90" />
+                </label>
+              </div>
+              <label class="field">
+                <span>Curvature / Looseness (<span id="conn-loose-val">1.0</span>)</span>
+                <input id="conn-loose-range" type="range" min="0.3" max="2.5" step="0.1" value="1.0" />
+              </label>
+            </div>
+
+            <div class="field-row three-col">
+              <label class="field">
+                <span>Arrowhead</span>
+                <select id="conn-arrowhead">
+                  <option value="->">Target (→)</option>
+                  <option value="<-">Source (←)</option>
+                  <option value="<->">Both (↔)</option>
+                  <option value="o-o">Dots (○—○)</option>
+                  <option value="none">None (—)</option>
+                </select>
+              </label>
+              <label class="field">
+                <span>Line Style</span>
+                <select id="conn-pattern">
+                  <option value="solid">Solid</option>
+                  <option value="dashed">Dashed</option>
+                  <option value="densely dashed">Densely Dashed</option>
+                  <option value="dotted">Dotted</option>
+                </select>
+              </label>
+              <label class="field">
+                <span>Thickness</span>
+                <select id="conn-thickness">
+                  <option value="thin">Thin</option>
+                  <option value="semithick">Semithick</option>
+                  <option value="thick">Thick</option>
+                  <option value="very thick">Very Thick</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="field-row three-col">
+              <label class="field">
+                <span>From Anchor</span>
+                <select id="conn-from-anchor">
+                  <option value="south">south</option>
+                  <option value="north">north</option>
+                  <option value="west">west</option>
+                  <option value="east">east</option>
+                  <option value="south west">south west</option>
+                  <option value="south east">south east</option>
+                </select>
+              </label>
+              <label class="field">
+                <span>To Anchor</span>
+                <select id="conn-to-anchor">
+                  <option value="south">south</option>
+                  <option value="north">north</option>
+                  <option value="west">west</option>
+                  <option value="east">east</option>
+                  <option value="south west">south west</option>
+                  <option value="south east">south east</option>
+                </select>
+              </label>
+              <label class="field">
+                <span>Color</span>
+                <div class="color-combo">
+                  <select id="conn-color-select"></select>
+                  <input id="conn-color-custom" type="color" value="#1e293b" />
+                </div>
+              </label>
+            </div>
+
+            <div class="field-row two-col">
+              <label class="field">
+                <span>From Y-Shift (pt)</span>
+                <input id="conn-from-yshift" type="number" step="1" value="0" title="e.g. -8 when starting below a subtree brace" />
+              </label>
+              <label class="field">
+                <span>To Y-Shift (pt)</span>
+                <input id="conn-to-yshift" type="number" step="1" value="0" title="e.g. -8 when ending below a subtree brace" />
+              </label>
+            </div>
+
+            <div class="sub-box">
+              <div class="field-row two-col">
+                <label class="field">
+                  <span>Arrow Label</span>
+                  <input id="conn-label-input" type="text" placeholder="e.g. Affix Hopping" />
+                </label>
+                <label class="field">
+                  <span>Label Position</span>
+                  <select id="conn-label-pos">
+                    <option value="below">Below</option>
+                    <option value="above">Above</option>
+                    <option value="left">Left</option>
+                    <option value="right">Right</option>
+                  </select>
+                </label>
+              </div>
+              <label class="checkbox-row">
+                <input id="conn-label-italic" type="checkbox" checked />
+                <span>Italic label (<code>\itshape</code>)</span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB: BRACKETS & CALLOUTS -->
+        <div id="tab-brackets" class="tab-pane">
+          <div class="inspector-block">
+            <div class="block-header">
+              <span>Subtree Bracket / Brace</span>
+              <input id="bracket-enable-chk" type="checkbox" title="Add brace, square bracket, or box around the selected node's subtree" />
+            </div>
+            <p class="hint-text">Applies to the currently selected node and its entire subtree (like Ex 14 in <code>instructions.tex</code>).</p>
+            <div id="bracket-fields" class="hidden">
+              <div class="field-row two-col">
+                <label class="field">
+                  <span>Bracket Shape</span>
+                  <select id="bracket-kind">
+                    <option value="brace">Curly Brace ({ })</option>
+                    <option value="square">Square Bracket ([ ])</option>
+                    <option value="box">Dashed / Solid Box</option>
+                  </select>
+                </label>
+                <label class="field">
+                  <span>Side</span>
+                  <select id="bracket-pos">
+                    <option value="below">Below Subtree</option>
+                    <option value="above">Above Subtree</option>
+                  </select>
+                </label>
+              </div>
+              <div class="field-row two-col">
+                <label class="field">
+                  <span>Color</span>
+                  <div class="color-combo">
+                    <select id="bracket-color-select"></select>
+                    <input id="bracket-color-custom" type="color" value="#1e293b" />
+                  </div>
+                </label>
+                <label class="field">
+                  <span>Label (optional)</span>
+                  <input id="bracket-label-input" type="text" placeholder="e.g. Head cluster" />
+                </label>
+              </div>
+              <label class="checkbox-row">
+                <input id="bracket-guides-chk" type="checkbox" checked />
+                <span>Include vertical <strong>dotted guide lines</strong> up to subtree</span>
+              </label>
+              <label class="field" id="bracket-guide-height-wrap">
+                <span>Right Dotted Line Extension (<span id="bracket-guide-val">3</span>em)</span>
+                <input id="bracket-guide-range" type="range" min="0" max="6" step="0.5" value="3" />
+              </label>
+            </div>
+          </div>
+
+          <div class="inspector-block">
+            <div class="block-header">
+              <span>Floating Callouts (e.g. <i>do</i>-support)</span>
+              <button id="callout-add-btn" class="btn-mini btn-mini-primary">+ Add on Selected</button>
+            </div>
+            <div id="callouts-list" class="item-list"></div>
+
+            <div id="callout-editor" class="sub-box hidden">
+              <div class="block-header">
+                <span>Edit Callout</span>
+                <button id="callout-delete-btn" class="btn-mini btn-mini-danger">Delete</button>
+              </div>
+              <div class="field-row two-col">
+                <label class="field">
+                  <span>Callout Text</span>
+                  <input id="callout-text-input" type="text" placeholder="\textit{do}-support" />
+                </label>
+                <label class="field">
+                  <span>Attached Node</span>
+                  <select id="callout-target-select"></select>
+                </label>
+              </div>
+              <div class="field-row three-col">
+                <label class="field">
+                  <span>Side</span>
+                  <select id="callout-side">
+                    <option value="left">Left</option>
+                    <option value="right">Right</option>
+                    <option value="below">Below</option>
+                    <option value="above">Above</option>
+                  </select>
+                </label>
+                <label class="field">
+                  <span>X Offset (em)</span>
+                  <input id="callout-ox" type="number" step="0.5" value="-1" />
+                </label>
+                <label class="field">
+                  <span>Y Offset (em)</span>
+                  <input id="callout-oy" type="number" step="0.5" value="-4" />
+                </label>
+              </div>
+              <div class="field-row two-col">
+                <label class="checkbox-row">
+                  <input id="callout-arrow-chk" type="checkbox" checked />
+                  <span>Pointer arrow</span>
+                </label>
+                <label class="field">
+                  <span>Arrow Shape</span>
+                  <select id="callout-routing">
+                    <option value="curved">Curved</option>
+                    <option value="right-angle">Right Angle</option>
+                    <option value="straight">Straight</option>
+                  </select>
+                </label>
+              </div>
+              <div id="callout-curve-row" class="field-row two-col">
+                <label class="field">
+                  <span>Out Angle (°)</span>
+                  <input id="callout-out" type="number" step="15" value="0" />
+                </label>
+                <label class="field">
+                  <span>In Angle (°)</span>
+                  <input id="callout-in" type="number" step="15" value="225" />
+                </label>
+              </div>
+              <label class="field">
+                <span>Color</span>
+                <div class="color-combo">
+                  <select id="callout-color-select"></select>
+                  <input id="callout-color-custom" type="color" value="#1e293b" />
+                </div>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB: TREE SETTINGS -->
+        <div id="tab-tree" class="tab-pane">
+          <div class="inspector-block">
+            <div class="block-header"><span>Forest Tree Spacing</span></div>
+            <div class="field-row two-col">
+              <label class="field">
+                <span>Sibling Sep (<code>s sep</code>)</span>
+                <select id="tree-ssep-select">
+                  <option value="0em">0em (default)</option>
+                  <option value="0pt">0pt</option>
+                  <option value="0.25em">0.25em</option>
+                  <option value="0.5em">0.5em</option>
+                  <option value="1em">1em</option>
+                  <option value="1.5em">1.5em</option>
+                </select>
+              </label>
+              <label class="field">
+                <span>Level Sep (<code>l sep</code>)</span>
+                <select id="tree-lsep-select">
+                  <option value="0.75em">0.75em</option>
+                  <option value="1em">1em (default)</option>
+                  <option value="1.5em">1.5em</option>
+                  <option value="2em">2em</option>
+                </select>
+              </label>
+            </div>
+          </div>
+
+          <div class="inspector-block">
+            <div class="block-header">
+              <span>Saved Trees (Browser Storage)</span>
+              <button id="save-tree-btn" class="btn-mini btn-mini-primary">Save Current</button>
+            </div>
+            <div id="saved-trees-list" class="item-list"></div>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <!-- IMPORT LATEX MODAL -->
+  <div id="import-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="import-modal-title">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2 id="import-modal-title">Import LaTeX <code>forest</code> Code</h2>
+        <button id="import-close-btn" class="icon-btn">✕</button>
+      </div>
+      <div class="modal-body">
+        <p class="hint-text">Paste any <code>\begin{forest} ... \end{forest}</code> block (including examples from <code>instructions.tex</code>) to load it into the visual editor.</p>
+        <textarea id="import-textarea" class="code-textarea" rows="14" placeholder="\begin{forest}&#10;  [CP [C\\$\emptyset$] [TP ...]]&#10;\end{forest}"></textarea>
+        <div id="import-error" class="error-box hidden"></div>
+      </div>
+      <div class="modal-footer">
+        <button id="import-cancel-btn" class="btn btn-ghost">Cancel</button>
+        <button id="import-confirm-btn" class="btn btn-primary">Import into Editor</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- COMPILE PDF PREVIEW MODAL -->
+  <div id="pdf-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="pdf-modal-title">
+    <div class="modal-card modal-wide">
+      <div class="modal-header">
+        <h2 id="pdf-modal-title">LaTeX (<code>pdflatex</code>) Verification Preview</h2>
+        <button id="pdf-close-btn" class="icon-btn">✕</button>
+      </div>
+      <div class="modal-body">
+        <div id="pdf-status" class="hint-text">Compiling with pdflatex…</div>
+        <div id="pdf-preview-wrap" class="pdf-preview-wrap"></div>
+        <pre id="pdf-log-box" class="error-box hidden"></pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- HELP MODAL -->
+  <div id="help-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="help-modal-title">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2 id="help-modal-title">SyntaxForest Guide &amp; Shortcuts</h2>
+        <button id="help-close-btn" class="icon-btn">✕</button>
+      </div>
+      <div class="modal-body help-body">
+        <h3>Quick Tree Editing</h3>
+        <ul>
+          <li><strong>Click node</strong>: Select it &amp; open its Node Inspector.</li>
+          <li><strong>Double-click node</strong>: Quick-edit its top label inline.</li>
+          <li><strong>Enter</strong>: Add a child branch to the selected node.</li>
+          <li><strong>P</strong>: Insert a parent branch above the selected node.</li>
+          <li><strong>C</strong>: Enter <em>Draw Arrow / Line</em> mode (click source node, then target node).</li>
+          <li><strong>Delete / Backspace</strong>: Delete the selected node (when not typing in a field).</li>
+          <li><strong>Ctrl/Cmd + Z / Y</strong>: Undo / Redo.</li>
+        </ul>
+        <h3>Drawing Movement, Agree, Binding &amp; Brackets</h3>
+        <ul>
+          <li>Switch to <strong>Draw Arrow / Line</strong> (or press <strong>C</strong>), click source node, then click target node.</li>
+          <li>In the <strong>Arrows</strong> tab, switch between <strong>Right Angles</strong> (<code>-- ++(0, -2em) -|</code>) and <strong>Curved</strong> (<code>to[out=..., in=...]</code>) or <strong>Straight</strong> lines, adjust drop depth or angles, set dashed/dotted/solid styles, and add italic labels like <em>Affix Hopping</em>.</li>
+          <li>In <strong>Brackets &amp; Notes</strong>, toggle a curly brace, square bracket, or box around any subtree with optional vertical dotted guide lines (like Example 14).</li>
+        </ul>
+        <h3>LaTeX Output Scope</h3>
+        <p>The code drawer strictly outputs only <code>\begin{forest} ... \end{forest}</code>, ready to paste directly inside <code>\ex ... \xe</code> in a <code>ling-200b</code> document.</p>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

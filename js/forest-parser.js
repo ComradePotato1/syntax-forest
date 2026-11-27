@@ -1,4 +1,4 @@
-import { makeNode, makeLine, makeFeatureLine, makeConnector, makeCallout } from './state.js?v=20261126c';
+import { makeNode, makeLine, makeFeatureLine, makeConnector, makeCallout } from './state.js?v=20261126e';
 
 /**
  * Parses a \begin{forest}...\end{forest} block (or raw bracket tree) into our TreeState.
@@ -170,14 +170,17 @@ export function parseForestLatex(rawInput) {
 
     const parts = parseHeaderAndOptions(header);
     const labelPart = parts.shift() || '';
-    const rawLines = labelPart.split(/\\\\/).map((x) => x.trim()).filter((x, i, arr) => x !== '' || arr.length === 1);
-    const lines = rawLines.length ? rawLines.map(parseLineItem) : [makeLine('')];
+    const isEmptyHeader = labelPart.trim() === '';
+    const rawLines = isEmptyHeader ? [] : labelPart.split(/\\\\/).map((x) => x.trim()).filter((x) => x !== '');
+    const lines = rawLines.map(parseLineItem);
 
     const node = makeNode(lines, []);
 
     for (const opt of parts) {
       if (!opt) continue;
-      if (opt.startsWith('for tree=')) {
+      if (opt === 'coordinate' || opt === 'shape=coordinate') {
+        continue;
+      } else if (opt.startsWith('for tree=')) {
         const inner = opt.slice('for tree='.length).replace(/^\{|\}$/g, '');
         const sSepM = inner.match(/s sep=([^,}]+)/);
         const lSepM = inner.match(/l sep=([^,}]+)/);
@@ -327,16 +330,25 @@ export function parseForestLatex(rawInput) {
       body.includes('rectangle')
     ) continue;
 
-    // Extract node label before scanning coordinates so parenthesized label text never interferes
+    // Extract node label(s) & blocked cross before scanning coordinates so parenthesized label text never interferes
+    let blocked = false;
     let label = '';
     let labelPos = 'below';
-    const nodeLabelM = body.match(/node\s*\[([^\]]*)\]\s*\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}/);
-    const bodyNoNode = nodeLabelM ? body.replace(nodeLabelM[0], '') : body;
-    if (nodeLabelM) {
-      label = nodeLabelM[2].trim();
-      if (nodeLabelM[1].includes('above')) labelPos = 'above';
-      else if (nodeLabelM[1].includes('left')) labelPos = 'left';
-      else if (nodeLabelM[1].includes('right')) labelPos = 'right';
+    let bodyNoNode = body;
+    const nodeRegex = /node\s*\[([^\]]*)\]\s*\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}/g;
+    let nm;
+    while ((nm = nodeRegex.exec(body)) !== null) {
+      const nOpts = nm[1];
+      const nContent = nm[2].trim();
+      bodyNoNode = bodyNoNode.replace(nm[0], '');
+      if (nContent === '\\nej' || nContent === '\\ding{55}') {
+        blocked = true;
+      } else if (nContent) {
+        label = nContent;
+        if (nOpts.includes('above')) labelPos = 'above';
+        else if (nOpts.includes('left')) labelPos = 'left';
+        else if (nOpts.includes('right')) labelPos = 'right';
+      }
     }
 
     // Match coordinates like (T.south) or ([yshift=-8pt]T.south)
@@ -413,6 +425,7 @@ export function parseForestLatex(rawInput) {
 
     let arrowHead = 'none';
     if (opts.includes('<->')) arrowHead = '<->';
+    else if (opts.includes('*->')) arrowHead = 'o->';
     else if (opts.includes('->') || opts.includes('mvt')) arrowHead = '->';
     else if (opts.includes('<-')) arrowHead = '<-';
     else if (opts.includes('binding') || opts.includes('agree') || /\bo\b/.test(opts)) arrowHead = 'o-o';
@@ -450,6 +463,7 @@ export function parseForestLatex(rawInput) {
       linePattern,
       thickness,
       color,
+      blocked,
       label,
       labelPos,
     }));

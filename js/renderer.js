@@ -1,4 +1,4 @@
-import { colorToCss } from './state.js?v=20261126c';
+import { colorToCss, isNodeEmpty } from './state.js?v=20261126e';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
@@ -232,13 +232,14 @@ export function renderTreeSvg(svg, state, ui) {
   // 1. Measure every node and resolve per-branch spacing
   function measure(node, inheritedGray = false, inheritedSSep = globalSSep, inheritedLSep = globalLSep) {
     const isGray = inheritedGray || Boolean(node.unpronounced);
-    const richLines = (node.lines || []).map(formatRichLine);
-    let maxW = 24;
+    const empty = isNodeEmpty(node);
+    const richLines = empty ? [] : (node.lines || []).map(formatRichLine);
+    let maxW = empty ? 0 : 24;
     for (const r of richLines) {
       if (r.approxWidth > maxW) maxW = r.approxWidth;
     }
-    if (node.projFeature) maxW += 14;
-    const h = Math.max(22, richLines.length * lineHeight + padY * 2);
+    if (!empty && node.projFeature) maxW += 14;
+    const h = empty ? 0 : Math.max(22, richLines.length * lineHeight + padY * 2);
 
     const effSSepStr = node.sSep || inheritedSSep;
     const effLSepStr = node.lSep || inheritedLSep;
@@ -246,7 +247,7 @@ export function renderTreeSvg(svg, state, ui) {
     const childrenLSep = Math.max(6, parseEm(effLSepStr, 15));
 
     meta.set(node.id, {
-      node, richLines, isGray, w: maxW, h,
+      node, richLines, isGray, isEmpty: empty, w: maxW, h,
       childrenSSep, childrenLSep,
       relX: 0, x: 0, y: 0,
     });
@@ -270,7 +271,8 @@ export function renderTreeSvg(svg, state, ui) {
   // 3. Bottom-up contour-based X layout (mirrors LaTeX forest s sep, including negative s sep)
   function layoutXBottomUp(node) {
     const m = meta.get(node.id);
-    const ownRect = { top: m.y, bottom: m.y + m.h, left: -m.w / 2, right: m.w / 2 };
+    // Use at least 1px vertical span for overlap checks so 0-height coordinate junctions still separate from siblings
+    const ownRect = { top: m.y, bottom: m.y + Math.max(1, m.h), left: -m.w / 2, right: m.w / 2 };
     if (!node.children || node.children.length === 0) {
       m.relX = 0;
       return [ownRect];
@@ -367,8 +369,8 @@ export function renderTreeSvg(svg, state, ui) {
 
       if (style !== 'none') {
         const x1 = pm.x;
-        const y1 = pm.nodeBox.bottom - 1;
-        const y2 = cm.nodeBox.top + 1;
+        const y1 = pm.isEmpty ? pm.y : pm.nodeBox.bottom - 1;
+        const y2 = cm.isEmpty ? cm.y : cm.nodeBox.top + 1;
 
         if (style === 'roof') {
           const leftX = cm.nodeBox.left + 4;
@@ -403,35 +405,53 @@ export function renderTreeSvg(svg, state, ui) {
 
   // 6. Render Nodes & Projected Features
   for (const m of meta.values()) {
-    const { node, richLines, isGray, w, h, x, y } = m;
+    const { node, richLines, isGray, isEmpty, w, h, x, y } = m;
     const isSelected = ui.selectedNodeId === node.id;
     const isSource = ui.connectSourceId === node.id;
     const cls = ['svg-node-group', isSelected ? 'selected' : '', isSource ? 'connect-source' : ''].filter(Boolean).join(' ');
 
     const g = el('g', { class: cls, 'data-node-id': node.id });
-    g.appendChild(el('rect', {
-      x: x - w / 2,
-      y,
-      width: w,
-      height: h,
-      class: 'svg-node-bg',
-    }));
+    if (isEmpty) {
+      g.appendChild(el('rect', {
+        x: x - 10,
+        y: y - 10,
+        width: 20,
+        height: 20,
+        class: 'svg-node-bg',
+      }));
+      if (isSelected || isSource) {
+        g.appendChild(el('circle', {
+          cx: x,
+          cy: y,
+          r: '4',
+          fill: isSource ? '#7c3aed' : '#2563eb',
+        }));
+      }
+    } else {
+      g.appendChild(el('rect', {
+        x: x - w / 2,
+        y,
+        width: w,
+        height: h,
+        class: 'svg-node-bg',
+      }));
 
-    const baseColor = node.nodeColor ? colorToCss(node.nodeColor) : (isGray ? '#94a3b8' : '#0f172a');
-    richLines.forEach((r, idx) => {
-      const ly = y + padY + idx * lineHeight + lineHeight / 2;
-      g.appendChild(renderRichTextElement(r, x, ly, baseColor));
-    });
-
-    if (node.projFeature) {
-      const pf = node.projFeature;
-      const pRich = formatRichLine({
-        type: 'feature',
-        text: pf.text || 'x',
-        featureKind: pf.featureKind || 'mf',
-        satisfied: pf.satisfied,
+      const baseColor = node.nodeColor ? colorToCss(node.nodeColor) : (isGray ? '#94a3b8' : '#0f172a');
+      richLines.forEach((r, idx) => {
+        const ly = y + padY + idx * lineHeight + lineHeight / 2;
+        g.appendChild(renderRichTextElement(r, x, ly, baseColor));
       });
-      g.appendChild(renderRichTextElement(pRich, m.nodeBox.right + 16, y + padY + lineHeight / 2, baseColor));
+
+      if (node.projFeature) {
+        const pf = node.projFeature;
+        const pRich = formatRichLine({
+          type: 'feature',
+          text: pf.text || 'x',
+          featureKind: pf.featureKind || 'mf',
+          satisfied: pf.satisfied,
+        });
+        g.appendChild(renderRichTextElement(pRich, m.nodeBox.right + 16, y + padY + lineHeight / 2, baseColor));
+      }
     }
 
     lNodes.appendChild(g);
@@ -661,6 +681,9 @@ export function renderTreeSvg(svg, state, ui) {
     else if (c.arrowHead === '<->') {
       mStart = ensureMarker('arrow-start', color, idx);
       mEnd = ensureMarker('arrow-end', color, idx);
+    } else if (c.arrowHead === 'o->') {
+      mStart = ensureMarker('dot', color, idx);
+      mEnd = ensureMarker('arrow-end', color, idx);
     } else if (c.arrowHead === 'o-o') {
       mStart = ensureMarker('dot', color, idx);
       mEnd = ensureMarker('dot', color, idx);
@@ -681,14 +704,31 @@ export function renderTreeSvg(svg, state, ui) {
     }));
     cg.appendChild(el('path', { d, class: 'svg-connector-hit' }));
 
+    if (c.blocked) {
+      cg.appendChild(el('circle', {
+        cx: labelPt.x,
+        cy: labelPt.y,
+        r: '7',
+        fill: '#fcfdff',
+      }));
+      cg.appendChild(el('path', {
+        d: `M ${labelPt.x - 4.5} ${labelPt.y - 4.5} L ${labelPt.x + 4.5} ${labelPt.y + 4.5} M ${labelPt.x + 4.5} ${labelPt.y - 4.5} L ${labelPt.x - 4.5} ${labelPt.y + 4.5}`,
+        fill: 'none',
+        stroke: color,
+        'stroke-width': '2',
+        'stroke-linecap': 'round',
+      }));
+    }
+
     if (c.label && c.label.trim()) {
       let lx = labelPt.x;
       let ly = labelPt.y;
       let anchor = 'middle';
-      if (c.labelPos === 'below') ly += 14;
-      else if (c.labelPos === 'above') ly -= 10;
-      else if (c.labelPos === 'left') { lx -= 8; anchor = 'end'; }
-      else if (c.labelPos === 'right') { lx += 8; anchor = 'start'; }
+      const extra = c.blocked ? 5 : 0;
+      if (c.labelPos === 'below') ly += 14 + extra;
+      else if (c.labelPos === 'above') ly -= 10 + extra;
+      else if (c.labelPos === 'left') { lx -= 8 + extra; anchor = 'end'; }
+      else if (c.labelPos === 'right') { lx += 8 + extra; anchor = 'start'; }
 
       cg.appendChild(el('text', {
         x: lx,

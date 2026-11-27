@@ -14,11 +14,11 @@ import {
   unwrapNodeById,
   insertParentAbove,
   HistoryManager,
-} from './state.js?v=20261126c';
-import { buildPreset } from './presets.js?v=20261126c';
-import { generateForestLatex } from './latex-gen.js?v=20261126c';
-import { parseForestLatex } from './forest-parser.js?v=20261126c';
-import { renderTreeSvg } from './renderer.js?v=20261126c';
+} from './state.js?v=20261126e';
+import { buildPreset } from './presets.js?v=20261126e';
+import { generateForestLatex } from './latex-gen.js?v=20261126e';
+import { parseForestLatex } from './forest-parser.js?v=20261126e';
+import { renderTreeSvg } from './renderer.js?v=20261126e';
 
 const STORAGE_KEY = 'syntaxforest_autosave_v1';
 const SAVED_TREES_KEY = 'syntaxforest_saved_trees_v1';
@@ -402,6 +402,14 @@ function renderNodeInspector() {
   // Lines list
   const linesList = document.getElementById('lines-list');
   linesList.innerHTML = '';
+  if (node.lines.length === 0) {
+    const emptyHint = document.createElement('div');
+    emptyHint.className = 'hint-text';
+    emptyHint.innerHTML = node.children.length > 0
+      ? 'No text or features — renders as a seamless branch junction (<code>coordinate</code>). Click <strong>+ Line</strong> or <strong>+ Feature</strong> to add a label.'
+      : 'Empty node (<code>coordinate</code>). Click <strong>+ Line</strong> or <strong>+ Feature</strong> to add a label.';
+    linesList.appendChild(emptyHint);
+  }
   node.lines.forEach((line, idx) => {
     const card = document.createElement('div');
     card.className = 'line-card';
@@ -519,7 +527,7 @@ function renderNodeInspector() {
     const delBtn = document.createElement('button');
     delBtn.className = 'btn-mini btn-mini-danger';
     delBtn.textContent = '✕';
-    delBtn.disabled = node.lines.length <= 1;
+    delBtn.title = 'Remove line';
     delBtn.onclick = () => {
       node.lines.splice(idx, 1);
       commitState();
@@ -666,6 +674,8 @@ function renderConnectorsInspector() {
         conn.arrowHead = '->'; conn.linePattern = 'solid'; conn.thickness = 'semithick';
       } else if (p === 'mvt-dashed') {
         conn.arrowHead = '->'; conn.linePattern = 'dashed'; conn.thickness = 'semithick';
+      } else if (p === 'dot-arrow') {
+        conn.arrowHead = 'o->'; conn.linePattern = 'solid'; conn.thickness = 'semithick';
       } else if (p === 'agree') {
         conn.arrowHead = 'o-o'; conn.linePattern = 'dotted'; conn.thickness = 'very thick';
       } else if (p === 'binding') {
@@ -832,9 +842,14 @@ function renderConnectorsInspector() {
   const lblInp = document.getElementById('conn-label-input');
   const lblPos = document.getElementById('conn-label-pos');
   const lblIt = document.getElementById('conn-label-italic');
+  const blockedChk = document.getElementById('conn-blocked-chk');
   lblInp.value = conn.label || '';
   lblPos.value = conn.labelPos || 'below';
   lblIt.checked = conn.labelItalic !== false;
+  if (blockedChk) {
+    blockedChk.checked = Boolean(conn.blocked);
+    blockedChk.onchange = () => { conn.blocked = blockedChk.checked; commitState(); };
+  }
   lblInp.oninput = () => { conn.label = lblInp.value; renderCanvasAndCode(); };
   lblInp.onchange = () => commitState();
   lblPos.onchange = () => { conn.labelPos = lblPos.value; commitState(); };
@@ -1160,8 +1175,13 @@ function setupCanvasInteractions() {
     const finish = (save) => {
       inlinePop.classList.add('hidden');
       if (save) {
-        if (!node.lines.length) node.lines.push(makeLine(inlineInput.value));
-        else node.lines[0].text = inlineInput.value;
+        if (!inlineInput.value.trim() && node.lines.length <= 1) {
+          node.lines = [];
+        } else if (!node.lines.length) {
+          node.lines.push(makeLine(inlineInput.value));
+        } else {
+          node.lines[0].text = inlineInput.value;
+        }
         commitState();
       }
       inlineInput.onkeydown = null;

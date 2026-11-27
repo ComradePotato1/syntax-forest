@@ -3,6 +3,7 @@ import { generateForestLatex } from '../js/latex-gen.js';
 import { parseForestLatex } from '../js/forest-parser.js';
 import { renderTreeSvg } from '../js/renderer.js';
 import {
+  makeNode,
   makeConnector,
   makeCallout,
   insertParentAbove,
@@ -103,11 +104,14 @@ childB.lSep = '1.75em';
 childB.sepScope = 'children';
 childB.bracket = { kind: 'square', position: 'below', dottedGuides: true, guideHeight: 2.5, color: 'teal', label: 'TP domain' };
 childB.children[0].bracket = { kind: 'box', boxStyle: 'solid', position: 'below', dottedGuides: false, guideHeight: 3, color: 'orange', label: '' };
+// Empty intermediate junction node (removing all lines/features yields [, coordinate ...])
+const emptyJunc = makeNode([], [makeNode('Spec'), makeNode('Compl')]);
+custom.root.children[0].children.push(emptyJunc);
 const insertedId = insertParentAbove(custom, childA.id, 'ForceP');
 assert(Boolean(insertedId), 'insertParentAbove worked');
 custom.connectors.push(makeConnector(childA.id, childB.id, {
   routing: 'curved', outAngle: -100, inAngle: -80, looseness: 1.2,
-  arrowHead: '<->', linePattern: 'dashed', color: '#7c3aed', label: 'Curved Link',
+  arrowHead: 'o->', linePattern: 'dashed', color: '#7c3aed', blocked: true, label: 'Curved Link',
 }));
 custom.connectors.push(makeConnector(childA.id, childB.children[0].id, {
   routing: 'right-angle', raMode: 'l-bend',
@@ -148,11 +152,16 @@ assert(customLatex.includes('\\textsc{'), 'Small caps \\textsc{} emitted');
 assert(customLatex.includes('rectangle') && customLatex.includes('rounded corners=3pt'), 'Constituent box emitted');
 assert(customLatex.includes(') |- (') && customLatex.includes(') -| ('), 'Right-angle L-bend and 7-bend emitted');
 assert(customLatex.includes('++(-3.25em, 0) |-'), 'Right-angle left C-route emitted');
-assert(/to\[out=-100, in=-80[^\]]*\]\s+node \[pos=0\.5[^\]]*\] \{Curved Link\} \(/.test(customLatex), 'Curved arrow label placed before target coord');
+assert(customLatex.includes('[, coordinate'), 'Empty intermediate node emits [, coordinate');
+assert(customLatex.includes('*->'), 'Dot-to-arrow *-> emitted');
+assert(customLatex.includes('{\\nej}'), 'Blocked cross \\nej emitted');
+assert(/to\[out=-100, in=-80[^\]]*\][\s\S]*node \[pos=0\.5[^\]]*\] \{\\nej\}[\s\S]*node \[pos=0\.5[^\]]*\] \{Curved Link\} \(/.test(customLatex), 'Blocked cross and curved label placed before target coord');
 const parsedCustom = parseForestLatex(customLatex);
 assert(parsedCustom.root.children[1].sSep === '2.5em', 'Per-branch sSep round-tripped');
 assert(parsedCustom.root.children[0].children[0].lines[0].smallCaps === true, 'Small caps round-tripped');
-assert(parsedCustom.connectors.some((c) => c.routing === 'curved' && c.label === 'Curved Link'), 'Curved arrow label round-tripped');
+assert(parsedCustom.connectors.some((c) => c.routing === 'curved' && c.arrowHead === 'o->' && c.blocked === true && c.label === 'Curved Link'), 'Dot-to-arrow, blocked cross, and curved arrow label round-tripped');
+const parsedJunc = parsedCustom.root.children[0].children[0].children.find((n) => n.children.length === 2);
+assert(Boolean(parsedJunc) && parsedJunc.lines.length === 0, 'Empty coordinate junction round-tripped');
 out.snippets.custom_mutations = customLatex;
 
 const mix = hexToTikzRgb('#2563eb');

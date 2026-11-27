@@ -147,10 +147,11 @@ export function makeConnector(fromId, toId, opts = {}) {
     toYShift: 0,
     fromXShift: 0,
     toXShift: 0,
-    arrowHead: '->', // '->' | '<-' | '<->' | 'o-o' | 'none'
+    arrowHead: '->', // '->' | '<-' | '<->' | 'o->' | 'o-o' | 'none'
     linePattern: 'solid', // 'solid' | 'dashed' | 'densely dashed' | 'dotted'
     thickness: 'semithick',
     color: '',
+    blocked: false,
     label: '',
     labelPos: 'below',
     labelItalic: true,
@@ -210,8 +211,15 @@ export function collectNodes(root, list = []) {
   return list;
 }
 
+export function isNodeEmpty(node) {
+  if (!node || !node.lines || node.lines.length === 0) return true;
+  return node.lines.every((l) => l.type !== 'feature' && !(l.text || '').trim());
+}
+
 export function nodeSummaryLabel(node) {
-  if (!node || !node.lines || node.lines.length === 0) return '(empty)';
+  if (!node || isNodeEmpty(node)) {
+    return node && node.children && node.children.length > 0 ? '(junction)' : '(empty)';
+  }
   const first = node.lines[0];
   let txt = first.text || '(empty)';
   txt = txt.replace(/\\xbar\{([^}]*)\}/g, "$1'").replace(/\\head\{([^}]*)\}/g, '$1⁰').replace(/\\vP/g, 'vP').replace(/\\littlev/g, 'v');

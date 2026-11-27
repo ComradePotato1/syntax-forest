@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>SyntaxForest — LaTeX Forest Syntax Tree Builder</title>
-  <link rel="stylesheet" href="styles.css?v=20261126c" />
+  <link rel="stylesheet" href="styles.css?v=20261126e" />
 </head>
 <body>
   <div id="app" class="app-shell">
@@ -356,6 +356,7 @@
               <div class="preset-pills" id="conn-style-pills">
                 <button data-cpreset="mvt" class="pill-btn">Movement →</button>
                 <button data-cpreset="mvt-dashed" class="pill-btn">Dashed Mvt ⇢</button>
+                <button data-cpreset="dot-arrow" class="pill-btn">Dot → Arrow ●→</button>
                 <button data-cpreset="agree" class="pill-btn">Agree ○···○</button>
                 <button data-cpreset="binding" class="pill-btn">Binding ○—○</button>
                 <button data-cpreset="dotted" class="pill-btn">Dotted →</button>
@@ -433,6 +434,7 @@
                   <option value="->">Target (→)</option>
                   <option value="<-">Source (←)</option>
                   <option value="<->">Both (↔)</option>
+                  <option value="o->">Dot → Arrow (●→)</option>
                   <option value="o-o">Dots (○—○)</option>
                   <option value="none">None (—)</option>
                 </select>
@@ -519,6 +521,10 @@
               <label class="checkbox-row">
                 <input id="conn-label-italic" type="checkbox" checked />
                 <span>Italic label (<code>\itshape</code>)</span>
+              </label>
+              <label class="checkbox-row">
+                <input id="conn-blocked-chk" type="checkbox" />
+                <span>Blocked operation cross (<code>✗</code> in middle)</span>
               </label>
             </div>
           </div>
@@ -762,6 +768,6 @@
     </div>
   </div>
 
-  <script type="module" src="js/app.js?v=20261126c"></script>
+  <script type="module" src="js/app.js?v=20261126e"></script>
 </body>
 </html>

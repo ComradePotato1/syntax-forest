@@ -1,4 +1,4 @@
-import { collectNodes, hexToTikzRgb } from './state.js?v=20261126c';
+import { collectNodes, hexToTikzRgb, isNodeEmpty } from './state.js?v=20261126e';
 
 function formatColorOpt(color) {
   if (!color) return '';
@@ -191,9 +191,13 @@ export function generateForestLatex(state) {
 
   function renderNode(node, depth = 1) {
     const indent = '    '.repeat(depth);
-    const labelStr = (node.lines || []).map(formatLineLatex).join('\\\\') || ' ';
+    const empty = isNodeEmpty(node);
+    const labelStr = empty ? '' : (node.lines || []).map(formatLineLatex).join('\\\\');
 
     const opts = [];
+    if (empty) {
+      opts.push('coordinate');
+    }
     // Root tree options and per-node separation options
     const ft = [];
     if (depth === 1 && state.treeOptions) {
@@ -270,9 +274,14 @@ export function generateForestLatex(state) {
     const toRef = toMeta.fitName || toMeta.nodeName;
 
     const drawOpts = [];
-    // Arrowhead / o-o style
+    // Arrowhead / dot-to-arrow / o-o style
     if (c.arrowHead === 'o-o') {
       drawOpts.push('o', 'rounded corners=1pt');
+    } else if (c.arrowHead === 'o->') {
+      drawOpts.push('*->');
+      if (c.routing === 'right-angle' && c.roundedCorners !== false) {
+        drawOpts.push('rounded corners=1pt');
+      }
     } else {
       if (c.arrowHead && c.arrowHead !== 'none') drawOpts.push(c.arrowHead);
       if (c.routing === 'right-angle' && c.roundedCorners !== false) {
@@ -294,32 +303,40 @@ export function generateForestLatex(state) {
     const startCoord = coordExpr(fromRef, c.fromAnchor, c.fromXShift, c.fromYShift);
     const endCoord = coordExpr(toRef, c.toAnchor, c.toXShift, c.toYShift);
 
-    let labelPart = '';
+    const raMode = c.raMode || (c.direction === 'above' ? 'u-above' : c.direction === 'side' ? 'l-bend' : 'u-below');
+    const posFrac = c.routing === 'right-angle'
+      ? (raMode === 'l-bend' ? 0.75 : (c.labelFraction ?? 0.25))
+      : 0.5;
+
+    const pathNodes = [];
+    if (c.blocked) {
+      const bOpts = [`pos=${posFrac}`, 'fill=white', 'inner sep=0.5pt', 'font=\\small'];
+      if (c.color) bOpts.push(`text=${formatColorOpt(c.color)}`);
+      pathNodes.push(`node [${bOpts.join(', ')}] {\\nej}`);
+    }
     if (c.label && c.label.trim()) {
-      const raMode = c.raMode || (c.direction === 'above' ? 'u-above' : c.direction === 'side' ? 'l-bend' : 'u-below');
-      const posFrac = c.routing === 'right-angle'
-        ? (raMode === 'l-bend' ? 0.75 : (c.labelFraction ?? 0.25))
-        : 0.5;
       const lOpts = [`pos=${posFrac}`];
       if (c.labelItalic !== false) lOpts.push('font=\\itshape\\small');
       else lOpts.push('font=\\small');
-      if (c.labelPos) lOpts.push(c.labelPos);
+      if (c.labelPos) {
+        lOpts.push(c.blocked ? `${c.labelPos}=4pt` : c.labelPos);
+      }
       if (c.color) lOpts.push(`text=${formatColorOpt(c.color)}`);
-      labelPart = ` node [${lOpts.join(', ')}] {${c.label.trim()}}`;
+      pathNodes.push(`node [${lOpts.join(', ')}] {${c.label.trim()}}`);
     }
+    const labelPart = pathNodes.length ? `\n        ${pathNodes.join('\n        ')}` : '';
 
     if (c.routing === 'curved') {
       const outA = c.outAngle != null ? c.outAngle : -90;
       const inA = c.inAngle != null ? c.inAngle : -90;
       const loose = c.looseness != null && Number(c.looseness) !== 1 ? `, looseness=${c.looseness}` : '';
       // In TikZ, node labels on a `to[...]` path must appear before the target coordinate
-      return `    \\draw [${drawOpts.join(', ')}] ${startCoord} to[out=${outA}, in=${inA}${loose}]${labelPart ? `\n       ${labelPart}` : ''} ${endCoord};`;
+      return `    \\draw [${drawOpts.join(', ')}] ${startCoord} to[out=${outA}, in=${inA}${loose}]${labelPart} ${endCoord};`;
     }
 
     let pathStr = '';
     if (c.routing === 'right-angle') {
       const drop = Number(c.dropDepth ?? 1.8);
-      const raMode = c.raMode || (c.direction === 'above' ? 'u-above' : c.direction === 'side' ? 'l-bend' : 'u-below');
       if (raMode === 'l-bend') {
         pathStr = `${startCoord} |- ${endCoord}`;
       } else if (raMode === '7-bend') {
@@ -337,7 +354,7 @@ export function generateForestLatex(state) {
       pathStr = `${startCoord} -- ${endCoord}`;
     }
 
-    return `    \\draw [${drawOpts.join(', ')}] ${pathStr}${labelPart ? `\n       ${labelPart}` : ''};`;
+    return `    \\draw [${drawOpts.join(', ')}] ${pathStr}${labelPart};`;
   }
 
   function renderCallout(cal, idx) {

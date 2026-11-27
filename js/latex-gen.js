@@ -1,4 +1,4 @@
-import { collectNodes, hexToTikzRgb } from './state.js?v=20261126b';
+import { collectNodes, hexToTikzRgb } from './state.js?v=20261126c';
 
 function formatColorOpt(color) {
   if (!color) return '';
@@ -151,7 +151,9 @@ export function generateForestLatex(state) {
           lines.push(`\\draw [semithick${cOpt}] ([yshift=-4pt]${fitName}.north west) -- (${fitName}.north west) -- (${fitName}.north east) -- ([yshift=-4pt]${fitName}.north east);`);
         }
       } else if (b.kind === 'box') {
-        lines.push(`\\draw [dashed, semithick, rounded corners=3pt${cOpt}] (${fitName}.south west) rectangle (${fitName}.north east);`);
+        const bs = b.boxStyle || 'dashed';
+        const pat = bs === 'solid' ? 'semithick' : bs === 'dotted' ? 'dotted, thick' : 'dashed, semithick';
+        lines.push(`\\draw [${pat}, rounded corners=3pt${cOpt}] (${fitName}.south west) rectangle (${fitName}.north east);`);
       }
 
       if (b.dottedGuides && b.kind !== 'box') {

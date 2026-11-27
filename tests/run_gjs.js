@@ -102,6 +102,7 @@ childB.sSep = '2.5em';
 childB.lSep = '1.75em';
 childB.sepScope = 'children';
 childB.bracket = { kind: 'square', position: 'below', dottedGuides: true, guideHeight: 2.5, color: 'teal', label: 'TP domain' };
+childB.children[0].bracket = { kind: 'box', boxStyle: 'solid', position: 'below', dottedGuides: false, guideHeight: 3, color: 'orange', label: '' };
 const insertedId = insertParentAbove(custom, childA.id, 'ForceP');
 assert(Boolean(insertedId), 'insertParentAbove worked');
 custom.connectors.push(makeConnector(childA.id, childB.id, {
@@ -144,6 +145,7 @@ const customLatex = generateForestLatex(custom);
 assert(customLatex.startsWith('\\begin{forest}') && customLatex.endsWith('\\end{forest}'), 'Custom tree strictly forest block');
 assert(customLatex.includes('s sep=2.5em') && customLatex.includes('l sep=1.75em'), 'Per-branch s sep and l sep emitted');
 assert(customLatex.includes('\\textsc{'), 'Small caps \\textsc{} emitted');
+assert(customLatex.includes('rectangle') && customLatex.includes('rounded corners=3pt'), 'Constituent box emitted');
 assert(customLatex.includes(') |- (') && customLatex.includes(') -| ('), 'Right-angle L-bend and 7-bend emitted');
 assert(customLatex.includes('++(-3.25em, 0) |-'), 'Right-angle left C-route emitted');
 assert(/to\[out=-100, in=-80[^\]]*\]\s+node \[pos=0\.5[^\]]*\] \{Curved Link\} \(/.test(customLatex), 'Curved arrow label placed before target coord');

@@ -14,11 +14,11 @@ import {
   unwrapNodeById,
   insertParentAbove,
   HistoryManager,
-} from './state.js?v=20261126b';
-import { buildPreset } from './presets.js?v=20261126b';
-import { generateForestLatex } from './latex-gen.js?v=20261126b';
-import { parseForestLatex } from './forest-parser.js?v=20261126b';
-import { renderTreeSvg } from './renderer.js?v=20261126b';
+} from './state.js?v=20261126c';
+import { buildPreset } from './presets.js?v=20261126c';
+import { generateForestLatex } from './latex-gen.js?v=20261126c';
+import { parseForestLatex } from './forest-parser.js?v=20261126c';
+import { renderTreeSvg } from './renderer.js?v=20261126c';
 
 const STORAGE_KEY = 'syntaxforest_autosave_v1';
 const SAVED_TREES_KEY = 'syntaxforest_saved_trees_v1';
@@ -272,8 +272,13 @@ function positionFloatingBar() {
   const sx = m.nodeBox.cx * ui.zoom + ui.panX;
   const sy = m.nodeBox.top * ui.zoom + ui.panY - 36;
   const rect = canvasWrap.getBoundingClientRect();
-  nodeFloatBar.style.left = `${Math.max(130, Math.min(rect.width - 130, sx))}px`;
+  nodeFloatBar.style.left = `${Math.max(165, Math.min(rect.width - 165, sx))}px`;
   nodeFloatBar.style.top = `${Math.max(8, sy < 10 ? m.nodeBox.bottom * ui.zoom + ui.panY + 8 : sy)}px`;
+  const node = m.node;
+  nodeFloatBar.querySelector('[data-q="brace"]')?.classList.toggle('active', node.bracket?.kind === 'brace');
+  nodeFloatBar.querySelector('[data-q="box"]')?.classList.toggle('active', node.bracket?.kind === 'box');
+  nodeFloatBar.querySelector('[data-q="roof"]')?.classList.toggle('active', node.edgeStyle === 'roof');
+  nodeFloatBar.querySelector('[data-q="unpronounced"]')?.classList.toggle('active', Boolean(node.unpronounced));
   nodeFloatBar.classList.remove('hidden');
 }
 
@@ -856,19 +861,29 @@ function renderBracketsAndCalloutsInspector() {
     const b = node.bracket;
     const kindEl = document.getElementById('bracket-kind');
     const posEl = document.getElementById('bracket-pos');
+    const posWrap = document.getElementById('bracket-pos-wrap');
+    const boxStyleWrap = document.getElementById('bracket-box-style-wrap');
+    const boxStyleEl = document.getElementById('bracket-box-style');
     const lblEl = document.getElementById('bracket-label-input');
     const gChk = document.getElementById('bracket-guides-chk');
     const gWrap = document.getElementById('bracket-guide-height-wrap');
     const gRange = document.getElementById('bracket-guide-range');
     const gVal = document.getElementById('bracket-guide-val');
 
+    const isBox = b.kind === 'box';
     kindEl.value = b.kind || 'brace';
     posEl.value = b.position || 'below';
+    if (posWrap) posWrap.classList.toggle('hidden', isBox);
+    if (boxStyleWrap) boxStyleWrap.classList.toggle('hidden', !isBox);
+    if (boxStyleEl) {
+      boxStyleEl.value = b.boxStyle || 'dashed';
+      boxStyleEl.onchange = () => { b.boxStyle = boxStyleEl.value; commitState(); };
+    }
     lblEl.value = b.label || '';
     gChk.checked = Boolean(b.dottedGuides);
     gRange.value = b.guideHeight ?? 3;
     gVal.textContent = String(gRange.value);
-    gWrap.classList.toggle('hidden', !b.dottedGuides || b.kind === 'box');
+    gWrap.classList.toggle('hidden', !b.dottedGuides || isBox);
 
     kindEl.onchange = () => { b.kind = kindEl.value; commitState(); };
     posEl.onchange = () => { b.position = posEl.value; commitState(); };
@@ -1214,7 +1229,10 @@ function wireEvents() {
         'Click the <strong>target node</strong> where the arrow ends…';
       renderAll();
     } else if (act === 'brace') {
-      node.bracket = node.bracket ? null : { kind: 'brace', position: 'below', dottedGuides: true, guideHeight: 3, color: '', label: '' };
+      node.bracket = node.bracket?.kind === 'brace' ? null : { kind: 'brace', position: 'below', dottedGuides: true, guideHeight: 3, color: '', label: '' };
+      commitState();
+    } else if (act === 'box') {
+      node.bracket = node.bracket?.kind === 'box' ? null : { kind: 'box', boxStyle: 'dashed', position: 'below', dottedGuides: false, guideHeight: 3, color: '', label: '' };
       commitState();
     } else if (act === 'roof') {
       node.edgeStyle = node.edgeStyle === 'roof' ? 'solid' : 'roof';

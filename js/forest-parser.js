@@ -1,4 +1,4 @@
-import { makeNode, makeLine, makeFeatureLine, makeConnector, makeCallout } from './state.js?v=20261126b';
+import { makeNode, makeLine, makeFeatureLine, makeConnector, makeCallout } from './state.js?v=20261126c';
 
 /**
  * Parses a \begin{forest}...\end{forest} block (or raw bracket tree) into our TreeState.
@@ -224,8 +224,12 @@ export function parseForestLatex(rawInput) {
           const kind = tikzBody.includes('rectangle') ? 'box' : (tikzBody.includes('brace') ? 'brace' : 'square');
           const hasDotted = tikzBody.includes('dotted');
           const yShiftM = tikzBody.match(/yshift=([0-9.]+)em/);
+          const boxStyle = kind === 'box'
+            ? (tikzBody.includes('dotted') ? 'dotted' : tikzBody.includes('dashed') ? 'dashed' : 'solid')
+            : 'dashed';
           node.bracket = {
             kind,
+            boxStyle,
             position: isAbove ? 'above' : 'below',
             dottedGuides: hasDotted,
             guideHeight: yShiftM ? parseFloat(yShiftM[1]) : 3,

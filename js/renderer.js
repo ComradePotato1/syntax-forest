@@ -1,4 +1,4 @@
-import { colorToCss } from './state.js?v=20261126b';
+import { colorToCss } from './state.js?v=20261126c';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
@@ -471,6 +471,7 @@ export function renderTreeSvg(svg, state, ui) {
         d, fill: 'none', stroke: color, 'stroke-width': '1.5',
       }));
     } else if (b.kind === 'box') {
+      const bs = b.boxStyle || 'dashed';
       lBrackets.appendChild(el('rect', {
         x: xL,
         y: box.top - 3,
@@ -479,8 +480,8 @@ export function renderTreeSvg(svg, state, ui) {
         rx: 4,
         fill: 'none',
         stroke: color,
-        'stroke-width': '1.4',
-        'stroke-dasharray': '5 3',
+        'stroke-width': bs === 'dotted' ? '1.6' : '1.4',
+        'stroke-dasharray': bs === 'solid' ? null : bs === 'dotted' ? '2 3' : '5 3',
       }));
     }
 

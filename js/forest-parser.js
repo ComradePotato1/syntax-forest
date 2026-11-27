@@ -178,7 +178,15 @@ export function parseForestLatex(rawInput) {
 
     for (const opt of parts) {
       if (!opt) continue;
-      if (opt === 'coordinate' || opt === 'shape=coordinate') {
+      if (
+        opt === 'coordinate' ||
+        opt === 'shape=coordinate' ||
+        opt === 'nice empty nodes' ||
+        opt.startsWith('calign=') ||
+        opt.startsWith('anchor=') ||
+        opt.startsWith('for parent=') ||
+        opt.startsWith('for current and siblings=')
+      ) {
         continue;
       } else if (opt.startsWith('for tree=')) {
         const inner = opt.slice('for tree='.length).replace(/^\{|\}$/g, '');

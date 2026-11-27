@@ -197,6 +197,13 @@ export function generateForestLatex(state) {
     const opts = [];
     if (empty) {
       opts.push('coordinate');
+      if (depth > 1) {
+        opts.push('for parent={calign=fixed edge angles}');
+      }
+      opts.push('calign=fixed edge angles');
+      if (depth > 1) {
+        opts.push('for current and siblings={anchor=north}');
+      }
     }
     // Root tree options and per-node separation options
     const ft = [];

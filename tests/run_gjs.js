@@ -154,7 +154,7 @@ assert(customLatex.includes('\\textsc{'), 'Small caps \\textsc{} emitted');
 assert(customLatex.includes('rectangle') && customLatex.includes('rounded corners=3pt'), 'Constituent box emitted');
 assert(customLatex.includes(') |- (') && customLatex.includes(') -| ('), 'Right-angle L-bend and 7-bend emitted');
 assert(customLatex.includes('++(-3.25em, 0) |-'), 'Right-angle left C-route emitted');
-assert(customLatex.includes('[, coordinate'), 'Empty intermediate node emits [, coordinate');
+assert(customLatex.includes('[, coordinate, for parent={calign=fixed edge angles}, calign=fixed edge angles, for current and siblings={anchor=north}'), 'Empty intermediate node emits high-branch straight-angle forest options');
 assert(customLatex.includes('*->'), 'Dot-to-arrow *-> emitted');
 assert(customLatex.includes('{\\nej}'), 'Blocked cross \\nej emitted');
 assert(/to\[out=-100, in=-80[^\]]*\][\s\S]*node \[pos=0\.5[^\]]*\] \{\\nej\}[\s\S]*node \[pos=0\.5[^\]]*\] \{Curved Link\} \(/.test(customLatex), 'Blocked cross and curved label placed before target coord');
@@ -165,13 +165,15 @@ assert(parsedCustom.connectors.some((c) => c.routing === 'curved' && c.arrowHead
 const parsedJunc = parsedCustom.root.children[0].children[0].children.find((n) => n.children.length === 2);
 assert(Boolean(parsedJunc) && parsedJunc.lines.length === 0, 'Empty coordinate junction round-tripped');
 
-// Empty text entry in Lines & Features must NOT trigger hidden coordinate node
+// Empty text entry in Lines & Features must NOT trigger hidden coordinate node; empty root omits for parent=
 const blankLineNode = makeNode([makeLine('')], [makeNode('A'), makeNode('B')]);
 assert(isNodeEmpty(blankLineNode) === false, 'Node with empty text line entry is NOT hidden coordinate');
 const blankTreeLatex = generateForestLatex({ treeOptions: { sSep: '0em', lSep: '1em' }, root: blankLineNode, connectors: [], callouts: [] });
 assert(!blankTreeLatex.includes('coordinate'), 'Empty text entry does not emit coordinate');
+const emptyRootLatex = generateForestLatex({ treeOptions: { sSep: '0em', lSep: '1em' }, root: makeNode([], [makeNode('A'), makeNode('B')]), connectors: [], callouts: [] });
+assert(emptyRootLatex.includes('[, coordinate, calign=fixed edge angles') && !emptyRootLatex.includes('for parent='), 'Empty root coordinate omits for parent');
 
-// Problematic intermediate node tree layout check (Z tucks below Y and clears X/z)
+// Problematic intermediate node tree: higher north branch alignment & collinear spine angles
 const probTex = `\\begin{forest}
     [XP, for tree={s sep=0.25em}
         [X [Z, name=n1] [X\\\\\\shf{z}]]
@@ -180,13 +182,37 @@ const probTex = `\\begin{forest}
     \\draw [->, thick] (n2.south) to[out=-115, in=-90, looseness=0.7] (n1.south);
 \\end{forest}`;
 const probState = parseForestLatex(probTex);
+const probLatex = generateForestLatex(probState);
+assert(probLatex.includes('[, coordinate, for parent={calign=fixed edge angles}, calign=fixed edge angles, for current and siblings={anchor=north}'), 'Generated problematic intermediate node emits high collinear options');
+const probRoundTrip = parseForestLatex(probLatex);
+assert(probRoundTrip.root.children[1].children[1].lines.length === 0, 'High collinear intermediate node round-trips cleanly');
 const probLayout = renderTreeSvg(svg, probState, {});
 const probVals = [...probLayout.meta.values()];
+const zpMeta = probVals.find((m) => m.node.lines[0]?.text === 'ZP');
 const yMeta = probVals.find((m) => m.node.lines[0]?.text === 'Y');
 const coordMeta = probVals.find((m) => m.isEmpty);
 const z2Meta = probVals.find((m) => m.node.name === 'n2');
-assert(coordMeta.y > yMeta.y && z2Meta.y > yMeta.nodeBox.bottom, 'Coordinate node aligned near Y baseline so child Z clears Y vertically');
+const dotsMeta = probVals.find((m) => m.node.lines[0]?.text === '...');
+assert(coordMeta.y === yMeta.nodeBox.top + 1, 'Empty coordinate node aligned at sibling north anchor (higher branching)');
+assert(z2Meta.y > yMeta.y + 10, 'Child Z clears sibling Y vertically');
+const slopeZpToCoord = (coordMeta.x - zpMeta.x) / (coordMeta.y - (zpMeta.nodeBox.bottom - 1));
+const slopeCoordToDots = (dotsMeta.x - coordMeta.x) / ((dotsMeta.nodeBox.top + 1) - coordMeta.y);
+const tan35 = Math.tan((35 * Math.PI) / 180);
+assert(Math.abs(slopeZpToCoord - tan35) < 0.005 && Math.abs(slopeCoordToDots - tan35) < 0.005, 'ZP -> coord -> ... spine is collinear at 35 deg');
+
+// Left-branching hidden coordinate node also aligns north and forms straight negative-slope spine
+const leftCoordState = parseForestLatex(`\\begin{forest}[ZP [, coordinate [...] [Z]] [Y]]\\end{forest}`);
+const leftLayout = renderTreeSvg(svg, leftCoordState, {});
+const leftVals = [...leftLayout.meta.values()];
+const lZp = leftVals.find((m) => m.node.lines[0]?.text === 'ZP');
+const lCoord = leftVals.find((m) => m.isEmpty);
+const lDots = leftVals.find((m) => m.node.lines[0]?.text === '...');
+const lSlope1 = (lCoord.x - lZp.x) / (lCoord.y - (lZp.nodeBox.bottom - 1));
+const lSlope2 = (lDots.x - lCoord.x) / ((lDots.nodeBox.top + 1) - lCoord.y);
+assert(Math.abs(lSlope1 + tan35) < 0.005 && Math.abs(lSlope2 + tan35) < 0.005, 'Left-branching coord spine is collinear at -35 deg');
+
 out.snippets.custom_mutations = customLatex;
+out.snippets.problematic_fixed = probLatex;
 
 const mix = hexToTikzRgb('#2563eb');
 assert(!mix.includes(',') && mix.includes('!'), `hexToTikzRgb valid xcolor mix: ${mix}`);

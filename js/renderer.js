@@ -258,21 +258,24 @@ export function renderTreeSvg(svg, state, ui) {
   measure(state.root, false, globalSSep, globalLSep);
 
   // 2. Top-down Y positions first so contour packing knows exact vertical overlaps
-  function assignY(node, topY, hasNonEmptySibling = false) {
+  function assignY(node, topY, isChild = false) {
     const m = meta.get(node.id);
-    // Align an empty coordinate node alongside non-empty siblings at their baseline (~16px down)
-    // so its children clear the sibling's box and match LaTeX forest's coordinate baseline alignment
-    m.y = m.isEmpty && hasNonEmptySibling ? topY + 16 : topY;
-    const childGap = m.isEmpty && hasNonEmptySibling ? Math.max(15, m.childrenLSep) : m.childrenLSep;
-    const childTopY = m.y + m.h + childGap;
-    const anyNonEmptyChild = (node.children || []).some((ch) => !meta.get(ch.id).isEmpty);
+    // Align empty coordinate nodes with sibling north anchors (for current and siblings={anchor=north})
+    m.y = m.isEmpty && isChild ? topY + 1 : topY;
+    const childTopY = m.y + m.h + m.childrenLSep;
     for (const ch of node.children || []) {
-      assignY(ch, childTopY, anyNonEmptyChild && (node.children || []).length > 1);
+      assignY(ch, childTopY, true);
     }
   }
   assignY(state.root, 0, false);
 
-  // 3. Bottom-up contour-based X layout (mirrors LaTeX forest s sep, including negative s sep)
+  function shiftSubtreeY(node, dy) {
+    const m = meta.get(node.id);
+    m.y += dy;
+    for (const ch of node.children || []) shiftSubtreeY(ch, dy);
+  }
+
+  // 3. Bottom-up contour-based X layout (mirrors LaTeX forest s sep and fixed edge angles around empty coordinates)
   function layoutXBottomUp(node) {
     const m = meta.get(node.id);
     // Use at least 1px vertical span for overlap checks so 0-height coordinate junctions still separate from siblings
@@ -283,7 +286,8 @@ export function renderTreeSvg(svg, state, ui) {
     }
 
     const childRectLists = node.children.map((ch) => layoutXBottomUp(ch));
-    const placedRects = [...childRectLists[0]];
+    const perChildRects = [childRectLists[0].map((r) => ({ ...r }))];
+    const placedRects = [...perChildRects[0]];
     meta.get(node.children[0].id).relX = 0;
 
     for (let i = 1; i < node.children.length; i++) {
@@ -307,19 +311,99 @@ export function renderTreeSvg(svg, state, ui) {
       }
 
       cm.relX = minDx;
-      for (const r of rects) {
-        placedRects.push({ top: r.top, bottom: r.bottom, left: r.left + minDx, right: r.right + minDx });
-      }
+      const shiftedChild = rects.map((r) => ({
+        top: r.top,
+        bottom: r.bottom,
+        left: r.left + minDx,
+        right: r.right + minDx,
+      }));
+      perChildRects.push(shiftedChild);
+      placedRects.push(...shiftedChild);
     }
 
-    // Center parent over first & last child centers (linguistics style)
-    const firstCx = meta.get(node.children[0].id).relX;
-    const lastCx = meta.get(node.children[node.children.length - 1].id).relX;
-    const mid = (firstCx + lastCx) / 2;
+    // Match LaTeX forest calign=fixed edge angles (-35/35 deg) on empty coordinates and their parents
+    const useFixedAngles =
+      node.children.length > 1 &&
+      (m.isEmpty || node.children.some((ch) => meta.get(ch.id).isEmpty));
+
+    let mid;
+    if (useFixedAngles) {
+      const TAN_35 = Math.tan((35 * Math.PI) / 180);
+      const pAnchorY = m.isEmpty ? m.y : m.y + m.h - 1;
+      const firstChild = node.children[0];
+      const lastChild = node.children[node.children.length - 1];
+      const c0m = meta.get(firstChild.id);
+      const cLm = meta.get(lastChild.id);
+      const L0 = Math.max(4, (c0m.isEmpty ? c0m.y : c0m.y + 1) - pAnchorY);
+      const LL = Math.max(4, (cLm.isEmpty ? cLm.y : cLm.y + 1) - pAnchorY);
+      const desiredS = TAN_35 * (LL + L0);
+      const actualS = cLm.relX - c0m.relX;
+
+      if (desiredS > actualS + 0.01) {
+        if (actualS <= 0.01) {
+          const startX = -TAN_35 * L0;
+          const step = desiredS / (node.children.length - 1);
+          node.children.forEach((ch, idx) => {
+            const cm = meta.get(ch.id);
+            const dx = startX + idx * step - cm.relX;
+            cm.relX += dx;
+            for (const r of perChildRects[idx]) {
+              r.left += dx;
+              r.right += dx;
+            }
+          });
+          mid = 0;
+        } else {
+          const ratio = desiredS / actualS;
+          const originX = c0m.relX;
+          node.children.forEach((ch, idx) => {
+            const cm = meta.get(ch.id);
+            const oldX = cm.relX;
+            const newX = originX + ratio * (oldX - originX);
+            const dx = newX - oldX;
+            cm.relX = newX;
+            for (const r of perChildRects[idx]) {
+              r.left += dx;
+              r.right += dx;
+            }
+          });
+          mid = c0m.relX + TAN_35 * L0;
+        }
+      } else if (desiredS < actualS - 0.01) {
+        const ratio = actualS / desiredS;
+        node.children.forEach((ch, idx) => {
+          const cm = meta.get(ch.id);
+          const Li = Math.max(4, (cm.isEmpty ? cm.y : cm.y + 1) - pAnchorY);
+          const dy = Li * (ratio - 1);
+          if (Math.abs(dy) > 0.01) {
+            shiftSubtreeY(ch, dy);
+            for (const r of perChildRects[idx]) {
+              r.top += dy;
+              r.bottom += dy;
+            }
+          }
+        });
+        const L0After = Math.max(4, (c0m.isEmpty ? c0m.y : c0m.y + 1) - pAnchorY);
+        mid = c0m.relX + TAN_35 * L0After;
+      } else {
+        mid = c0m.relX + TAN_35 * L0;
+      }
+    } else {
+      // Center parent over first & last child centers (linguistics style)
+      const firstCx = meta.get(node.children[0].id).relX;
+      const lastCx = meta.get(node.children[node.children.length - 1].id).relX;
+      mid = (firstCx + lastCx) / 2;
+    }
+
     for (const ch of node.children) {
       meta.get(ch.id).relX -= mid;
     }
-    const shifted = placedRects.map((r) => ({ top: r.top, bottom: r.bottom, left: r.left - mid, right: r.right - mid }));
+    const shifted = [];
+    for (const list of perChildRects) {
+      for (const r of list) {
+        shifted.push({ top: r.top, bottom: r.bottom, left: r.left - mid, right: r.right - mid });
+      }
+    }
     shifted.push(ownRect);
     return shifted;
   }

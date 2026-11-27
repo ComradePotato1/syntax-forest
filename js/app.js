@@ -14,11 +14,11 @@ import {
   unwrapNodeById,
   insertParentAbove,
   HistoryManager,
-} from './state.js?v=20261126e';
-import { buildPreset } from './presets.js?v=20261126e';
-import { generateForestLatex } from './latex-gen.js?v=20261126e';
-import { parseForestLatex } from './forest-parser.js?v=20261126e';
-import { renderTreeSvg } from './renderer.js?v=20261126e';
+} from './state.js?v=20261127a';
+import { buildPreset } from './presets.js?v=20261127a';
+import { generateForestLatex } from './latex-gen.js?v=20261127a';
+import { parseForestLatex } from './forest-parser.js?v=20261127a';
+import { renderTreeSvg } from './renderer.js?v=20261127a';
 
 const STORAGE_KEY = 'syntaxforest_autosave_v1';
 const SAVED_TREES_KEY = 'syntaxforest_saved_trees_v1';
@@ -1175,13 +1175,8 @@ function setupCanvasInteractions() {
     const finish = (save) => {
       inlinePop.classList.add('hidden');
       if (save) {
-        if (!inlineInput.value.trim() && node.lines.length <= 1) {
-          node.lines = [];
-        } else if (!node.lines.length) {
-          node.lines.push(makeLine(inlineInput.value));
-        } else {
-          node.lines[0].text = inlineInput.value;
-        }
+        if (!node.lines.length) node.lines.push(makeLine(inlineInput.value));
+        else node.lines[0].text = inlineInput.value;
         commitState();
       }
       inlineInput.onkeydown = null;

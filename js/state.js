@@ -212,8 +212,7 @@ export function collectNodes(root, list = []) {
 }
 
 export function isNodeEmpty(node) {
-  if (!node || !node.lines || node.lines.length === 0) return true;
-  return node.lines.every((l) => l.type !== 'feature' && !(l.text || '').trim());
+  return !node || !node.lines || node.lines.length === 0;
 }
 
 export function nodeSummaryLabel(node) {

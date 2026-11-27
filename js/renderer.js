@@ -1,4 +1,4 @@
-import { colorToCss, isNodeEmpty } from './state.js?v=20261126e';
+import { colorToCss, isNodeEmpty } from './state.js?v=20261127a';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
@@ -258,15 +258,19 @@ export function renderTreeSvg(svg, state, ui) {
   measure(state.root, false, globalSSep, globalLSep);
 
   // 2. Top-down Y positions first so contour packing knows exact vertical overlaps
-  function assignY(node, topY) {
+  function assignY(node, topY, hasNonEmptySibling = false) {
     const m = meta.get(node.id);
-    m.y = topY;
-    const childTopY = topY + m.h + m.childrenLSep;
+    // Align an empty coordinate node alongside non-empty siblings at their baseline (~16px down)
+    // so its children clear the sibling's box and match LaTeX forest's coordinate baseline alignment
+    m.y = m.isEmpty && hasNonEmptySibling ? topY + 16 : topY;
+    const childGap = m.isEmpty && hasNonEmptySibling ? Math.max(15, m.childrenLSep) : m.childrenLSep;
+    const childTopY = m.y + m.h + childGap;
+    const anyNonEmptyChild = (node.children || []).some((ch) => !meta.get(ch.id).isEmpty);
     for (const ch of node.children || []) {
-      assignY(ch, childTopY);
+      assignY(ch, childTopY, anyNonEmptyChild && (node.children || []).length > 1);
     }
   }
-  assignY(state.root, 0);
+  assignY(state.root, 0, false);
 
   // 3. Bottom-up contour-based X layout (mirrors LaTeX forest s sep, including negative s sep)
   function layoutXBottomUp(node) {

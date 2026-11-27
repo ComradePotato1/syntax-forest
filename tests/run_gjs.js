@@ -4,12 +4,14 @@ import { parseForestLatex } from '../js/forest-parser.js';
 import { renderTreeSvg } from '../js/renderer.js';
 import {
   makeNode,
+  makeLine,
   makeConnector,
   makeCallout,
   insertParentAbove,
   deleteNodeById,
   unwrapNodeById,
   hexToTikzRgb,
+  isNodeEmpty,
 } from '../js/state.js';
 
 // Minimal SVG DOM mock for GJS verification of renderer.js
@@ -162,6 +164,28 @@ assert(parsedCustom.root.children[0].children[0].lines[0].smallCaps === true, 'S
 assert(parsedCustom.connectors.some((c) => c.routing === 'curved' && c.arrowHead === 'o->' && c.blocked === true && c.label === 'Curved Link'), 'Dot-to-arrow, blocked cross, and curved arrow label round-tripped');
 const parsedJunc = parsedCustom.root.children[0].children[0].children.find((n) => n.children.length === 2);
 assert(Boolean(parsedJunc) && parsedJunc.lines.length === 0, 'Empty coordinate junction round-tripped');
+
+// Empty text entry in Lines & Features must NOT trigger hidden coordinate node
+const blankLineNode = makeNode([makeLine('')], [makeNode('A'), makeNode('B')]);
+assert(isNodeEmpty(blankLineNode) === false, 'Node with empty text line entry is NOT hidden coordinate');
+const blankTreeLatex = generateForestLatex({ treeOptions: { sSep: '0em', lSep: '1em' }, root: blankLineNode, connectors: [], callouts: [] });
+assert(!blankTreeLatex.includes('coordinate'), 'Empty text entry does not emit coordinate');
+
+// Problematic intermediate node tree layout check (Z tucks below Y and clears X/z)
+const probTex = `\\begin{forest}
+    [XP, for tree={s sep=0.25em}
+        [X [Z, name=n1] [X\\\\\\shf{z}]]
+        [ZP [Y] [, coordinate [Z, name=n2] [...]]]
+    ]
+    \\draw [->, thick] (n2.south) to[out=-115, in=-90, looseness=0.7] (n1.south);
+\\end{forest}`;
+const probState = parseForestLatex(probTex);
+const probLayout = renderTreeSvg(svg, probState, {});
+const probVals = [...probLayout.meta.values()];
+const yMeta = probVals.find((m) => m.node.lines[0]?.text === 'Y');
+const coordMeta = probVals.find((m) => m.isEmpty);
+const z2Meta = probVals.find((m) => m.node.name === 'n2');
+assert(coordMeta.y > yMeta.y && z2Meta.y > yMeta.nodeBox.bottom, 'Coordinate node aligned near Y baseline so child Z clears Y vertically');
 out.snippets.custom_mutations = customLatex;
 
 const mix = hexToTikzRgb('#2563eb');

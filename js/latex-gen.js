@@ -1,4 +1,4 @@
-import { collectNodes, hexToTikzRgb, isNodeEmpty } from './state.js?v=20261126e';
+import { collectNodes, hexToTikzRgb, isNodeEmpty } from './state.js?v=20261127a';
 
 function formatColorOpt(color) {
   if (!color) return '';
@@ -192,7 +192,7 @@ export function generateForestLatex(state) {
   function renderNode(node, depth = 1) {
     const indent = '    '.repeat(depth);
     const empty = isNodeEmpty(node);
-    const labelStr = empty ? '' : (node.lines || []).map(formatLineLatex).join('\\\\');
+    const labelStr = empty ? '' : ((node.lines || []).map(formatLineLatex).join('\\\\') || ' ');
 
     const opts = [];
     if (empty) {
